@@ -1,5 +1,87 @@
 import torch
 import numpy as np
+import tensornetwork as tn
+from tensornetwork import contractors
+tn.set_default_backend("pytorch")
+def contractor_engine(node_list,**kargs):
+    return contractors.auto(node_list,**kargs)[0].tensor
+def uniform_shape_tensor_contractor_tn(tensor,**kargs):
+    node_array = []
+    W,H = tensor.shape[:2]
+    for i in range(W):
+        node_line = []
+        for j in range(H):
+            node = tn.Node(tensor[i][j],name=f"{i}-{j}")
+            node_line.append(node)
+        node_array.append(node_line)
+
+    for i in range(W):
+        for j in range(H):
+            if j==H-1:node_array[i][j][2]^node_array[i  ][0  ][0]
+            else:     node_array[i][j][2]^node_array[i  ][j+1][0]
+            if i==W-1:node_array[i][j][3]^node_array[0  ][j  ][1]
+            else:     node_array[i][j][3]^node_array[i+1][j  ][1]
+
+    node_list = [item for sublist in node_array for item in sublist]
+    return contractor_engine(node_list,**kargs)
+def bulk_right_left_corner_contractor_tn(bulk_tensor,right_edge,down_edge,corn_tensor):
+    node_array = []
+    if len(bulk_tensor)==0:
+        W=H=0
+    else:
+        W,H = bulk_tensor.shape[:2]
+    W  += 1
+    H  += 1
+    for i in range(W):
+        node_line = []
+        for j in range(H):
+            if (i==W-1) and (j==H-1):
+                t = corn_tensor
+            elif i==W-1:
+                t = right_edge[j]
+            elif j==H-1:
+                t = down_edge[i]
+            else:
+                t = bulk_tensor[i][j]
+            node = tn.Node(t,name=f"{i}-{j}")
+            node_line.append(node)
+        node_array.append(node_line)
+
+    for i in range(W):
+        for j in range(H):
+            if j==H-1:node_array[i][j][2]^node_array[i  ][0  ][0]
+            else:     node_array[i][j][2]^node_array[i  ][j+1][0]
+            if i==W-1:node_array[i][j][3]^node_array[0  ][j  ][1]
+            else:     node_array[i][j][3]^node_array[i+1][j  ][1]
+
+    node_list = [item for sublist in node_array for item in sublist]
+    return contractor_engine(node_list)
+def tensor1_and_tensor2_contractor_tn(tensor1,tensor2):
+    node_array_1 = []
+    node_array_2 = []
+    W,H = tensor1.shape[:2]
+    for i in range(W):
+        node_line = []
+        for j in range(H):
+            node = tn.Node(tensor1[i][j],name=f"{i}-{j}")
+            node_line.append(node)
+        node_array_1.append(node_line)
+    for i in range(W):
+        node_line = []
+        for j in range(H):
+            node = tn.Node(tensor2[i][j],name=f"{i}-{j}")
+            node_line.append(node)
+        node_array_2.append(node_line)
+
+    for i in range(-1,W-1):
+        for j in range(-1,H-1):
+            node_array_2[i][j][0]^node_array_1[i][j][2]
+            node_array_2[i][j][1]^node_array_1[i][j+1][3]
+            node_array_2[i][j][2]^node_array_1[i+1][j+1][0]
+            node_array_2[i][j][3]^node_array_1[i+1][j][1]
+    node_list_1 = [item for sublist in node_array_1 for item in sublist]
+    node_list_2 = [item for sublist in node_array_2 for item in sublist]
+    return contractor_engine(node_list_1+node_list_2)
 def preprocess_sincos(x):
     n_data, C , dim0, dim1 = tuple(x.shape)
     n_sites = C * dim0 * dim1
@@ -23,7 +105,7 @@ def right_mps_form(mps_list):
     else:
         return mps_list
 
-def contract_two_mps(mps_list_1,mps_list_2):
+def contract_two_mps_tn(mps_list_1,mps_list_2):
     mps_list_1   = right_mps_form(mps_list_1)
     mps_list_2   = right_mps_form(mps_list_2)
     mps_nodes_1  = [tn.Node(v, name=f"t{i}") for i,v in enumerate(mps_list_1)]
@@ -32,7 +114,7 @@ def contract_two_mps(mps_list_1,mps_list_2):
     mps_edges_2  = [mps_nodes_2[i][-1]^mps_nodes_2[i+1][0] for i in range(len(mps_nodes_2)-1)]
     mps_edge     =([mps_nodes_1[0][0]^mps_nodes_2[0][0]]
                   +[mps_nodes_1[i][1]^mps_nodes_2[i][1] for i in range(1,len(mps_nodes_2))])
-    return contractors.auto(mps_nodes_1+mps_nodes_2).tensor
+    return contractor_engine(mps_nodes_1+mps_nodes_2)
 
 def contract_mps_mpo(mps_list,mpo_list):
     assert len(mps_list) > 2

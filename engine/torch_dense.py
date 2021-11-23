@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 def truncated_SVD(tensor,output='RQ',max_singular_values= None,
                   max_truncation_error= None,
                   relative = True,
@@ -136,7 +137,7 @@ def approxmate_mps_line(mps_line,
     scalar = 1
     if mode != 'right':
         if left_method == 'qr':
-            DCEngine = torch.qr
+            DCEngine = torch.linalg.qr if float(torch.__version__[:4])>1.07 else torch.qr
         elif left_method == 'svd':
             DCEngine = lambda x:truncated_SVD(x,output='QR')
         else:
