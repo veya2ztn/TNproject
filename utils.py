@@ -98,6 +98,18 @@ def preprocess_sum_one(x):
     n_sites = C * dim0 * dim1
     x = x.reshape((n_data, n_sites))
     return torch.stack([1-x,x],-1)
+def rd_engine(*x,**kargs):
+    x =  torch.randn(*x,device='cpu',**kargs)
+    x/=  torch.norm(x).sqrt()
+    return x
+def aggregation_patch(x,divide=4):
+    B, C , dim0, dim1 = tuple(x.shape)
+    assert dim0%divide==0
+    assert dim1%divide==0
+    x     = x.reshape((B, C,dim0//divide,divide,dim1//divide,divide)).permute(0,2,4,3,5,1)
+    x     = x.flatten(start_dim=-3,end_dim=-1)
+    return x
+
 
 def right_mps_form(mps_list):
     if (len(mps_list)==3 and len(mps_list[0].shape)+ 2 == len(mps_list[1].shape)):
