@@ -12,8 +12,17 @@ import numpy as  np
 from mltool.dataaccelerate import DataSimfetcher
 from mltool.loggingsystem import LoggingSystem
 
-
-
+DATAROOTPATH = f"{os.path.dirname(os.path.dirname(os.path.realpath(__file__)))}/.DATARoot.json"
+if os.path.exists(DATAROOTPATH):
+    with open(DATAROOTPATH,'r') as f:
+        RootDict=json.load(f)
+else:
+    RootDict = {"DATAROOT": "/root/data",
+                "SAVEROOT": "/root/checkpoints",
+                "EXP_HUB":"exp_hub"}
+DATAROOT  = RootDict['DATAROOT']
+SAVEROOT  = RootDict['SAVEROOT']
+EXP_HUB   = RootDict['EXP_HUB']
 lr           = 0.1
 batch_size   = 64
 virtual_bond = 3
@@ -22,13 +31,13 @@ gpu          = 1
 device       = 'cuda'
 MODEL_NAME   = "PEPS_einsum_uniform_shape_6x6_fast"
 TASK_NAME    = DB_NAME= MODEL_NAME
-SAVEROOT     = "./"
 transform = transforms.Compose([transforms.ToTensor()])
-DATAPATH    = '/media/tianning/DATA/DATASET/MNIST/'
-mnist_train = datasets.MNIST(DATAPATH, train=True, download=False, transform=transform)
-mnist_test  = datasets.MNIST(DATAPATH, train=False,download=False, transform=transform)
+
+mnist_train = datasets.MNIST(DATAROOT, train=True, download=False, transform=transform)
+mnist_test  = datasets.MNIST(DATAROOT, train=False,download=False, transform=transform)
 train_loader= torch.utils.data.DataLoader(dataset=mnist_train, batch_size=batch_size, shuffle=True)
 valid_loader = torch.utils.data.DataLoader(dataset=mnist_test,  batch_size=batch_size, shuffle=False)
+
 def do_train(model,config_pool,trial=None,**kargs):
 
     hparam_dict   = config_pool['hparam']
