@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from utils import preprocess_sincos, preprocess_binary,aggregation_patch
-from models.two_dim_model import PEPS_einsum_uniform_shape
+from models.two_dim_model import PEPS_einsum_uniform_shape,PEPS_einsum_uniform_shape_6x6_fast
 import random,time,os
 from optuna.trial import TrialState
 def preprocess_images(x):
@@ -11,26 +11,37 @@ def preprocess_images(x):
 import numpy as  np
 from mltool.dataaccelerate import DataSimfetcher
 from mltool.loggingsystem import LoggingSystem
-
-DATAROOTPATH = f"{os.path.dirname(os.path.dirname(os.path.realpath(__file__)))}/.DATARoot.json"
+import json
+DATAROOTPATH = f"{os.path.dirname(os.path.realpath(__file__))}/.DATARoot.json"
+print(DATAROOTPATH)
 if os.path.exists(DATAROOTPATH):
     with open(DATAROOTPATH,'r') as f:
         RootDict=json.load(f)
-else:
-    RootDict = {"DATAROOT": "/root/data",
-                "SAVEROOT": "/root/checkpoints",
-                "EXP_HUB":"exp_hub"}
+
 DATAROOT  = RootDict['DATAROOT']
 SAVEROOT  = RootDict['SAVEROOT']
 EXP_HUB   = RootDict['EXP_HUB']
-lr           = 0.1
-batch_size   = 64
-virtual_bond = 3
-init_std     = 1
-gpu          = 1
-device       = 'cuda'
+
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("-bs","--batch_size"  , default=64, type=int,help="batch_size")
+parser.add_argument("-vd","--virtual_bond", default=7 , type=int,help="virtual_bond dimension")
+parser.add_argument("-gpu","--gpu"        , default=0 , type=int,help="the gpu number")
+args = parser.parse_args()
+
 MODEL_NAME   = "PEPS_einsum_uniform_shape_6x6_fast"
-TASK_NAME    = DB_NAME= MODEL_NAME
+batch_size   = args.batch_size
+virtual_bond = args.virtual_bond
+gpu          = args.gpu
+job_gpu     = str(args.gpu)
+os.environ["CUDA_VISIBLE_DEVICES"] = job_gpu
+# lr           = 0.1
+# init_std     = 1
+
+device       = 'cuda'
+DB_NAME      = MODEL_NAME
+TASK_NAME    = MODEL_NAME+f".vd={virtual_bond}"
 transform = transforms.Compose([transforms.ToTensor()])
 
 mnist_train = datasets.MNIST(DATAROOT, train=True, download=False, transform=transform)
@@ -38,16 +49,15 @@ mnist_test  = datasets.MNIST(DATAROOT, train=False,download=False, transform=tra
 train_loader= torch.utils.data.DataLoader(dataset=mnist_train, batch_size=batch_size, shuffle=True)
 valid_loader = torch.utils.data.DataLoader(dataset=mnist_test,  batch_size=batch_size, shuffle=False)
 
-def do_train(model,config_pool,trial=None,**kargs):
+def do_train(model,config_pool,logsys,trial=None,**kargs):
 
     hparam_dict   = config_pool['hparam']
     epoches       = config_pool['epoches']
-    accu_list     = ['accu']
+    accu_list     = ['error']
     doearlystop   = False
     valid_per_epoch=1
     start_epoch   = 0
-
-    logsys            = LoggingSystem(True,"log/test")
+    lr            = hparam_dict['lr']
     logsys.regist({'task':config_pool['project_name'],
                   'model':config_pool['model_name']})
 
@@ -113,7 +123,7 @@ def do_train(model,config_pool,trial=None,**kargs):
             logits  = torch.cat(logits)
             pred_labels  = torch.argmax(logits,-1)
             accu =  torch.sum(pred_labels == labels)/len(labels)
-            valid_acc_pool = {'accu':accu.item()}
+            valid_acc_pool = {'error':1-accu.item()}
             update_accu    = logsys.metric_dict.update(valid_acc_pool,epoch)
             metric_dict    = logsys.metric_dict.metric_dict
             for accu_type in accu_list:
@@ -143,20 +153,20 @@ def objective(trial):
 
 
 
-    lr      = trial.suggest_uniform(f"learning_rate", 0.001,0.1)
+    lr      = trial.suggest_uniform(f"learning_rate", 0.001,0.01)
     init_std= trial.suggest_loguniform(f"init_std", 1e-5,1)
     trial.set_user_attr('trial_name', TRIAL_NOW)
 
 
-    model = PEPS_einsum_uniform_shape(6,6,10,in_physics_bond=16,virtual_bond_dim=virtual_bond,init_std=init_std)
+    model = PEPS_einsum_uniform_shape_6x6_fast(10,in_physics_bond=16,virtual_bond_dim=virtual_bond,init_std=init_std)
     device = 'cuda'
     model = model.to(device)
     config_pool= {"project_name":"Uniform_shape_finite_PEPS",
                     'model_name':MODEL_NAME,
                     "epoches":100,
-                    'hparam':{"lr":lr,"init_std":init_std}
+                    'hparam':{"lr":lr,"init_std":init_std,"vd":virtual_bond,"batch_size":batch_size}
     }
-    result = do_train(model,config_pool,trial=trial)
+    result = do_train(model,config_pool,logsys,trial=trial)
     del model
     torch.cuda.empty_cache()
     return result
