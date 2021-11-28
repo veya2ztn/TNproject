@@ -3,7 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from utils import preprocess_sincos, preprocess_binary,aggregation_patch
-from models.two_dim_model import PEPS_einsum_uniform_shape,PEPS_einsum_uniform_shape_6x6_fast
+from models.two_dim_model import (PEPS_einsum_uniform_shape,
+                                  PEPS_einsum_uniform_shape_6x6_fast,
+                                  PEPS_einsum_arbitrary_shape_fast,
+                                  PEPS_einsum_uniform_shape_6x6_fast2)
 import random,time,os
 from optuna.trial import TrialState
 def preprocess_images(x):
@@ -21,27 +24,31 @@ if os.path.exists(DATAROOTPATH):
 DATAROOT  = RootDict['DATAROOT']
 SAVEROOT  = RootDict['SAVEROOT']
 EXP_HUB   = RootDict['EXP_HUB']
-
+MODEL_NAME= "PEPS_einsum_uniform_shape_6x6_fast"
 
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-bs","--batch_size"  , default=64, type=int,help="batch_size")
 parser.add_argument("-vd","--virtual_bond", default=7 , type=int,help="virtual_bond dimension")
 parser.add_argument("-gpu","--gpu"        , default=0 , type=int,help="the gpu number")
+parser.add_argument("-W","--width"         , default=6 , type=int,help="the gpu number")
+parser.add_argument("-H","--height"        , default=6 , type=int,help="the gpu number")
 args = parser.parse_args()
 
-MODEL_NAME   = "PEPS_einsum_uniform_shape_6x6_fast"
+
 batch_size   = args.batch_size
 virtual_bond = args.virtual_bond
 gpu          = args.gpu
 job_gpu     = str(args.gpu)
+W = args.width
+H = args.height
 os.environ["CUDA_VISIBLE_DEVICES"] = job_gpu
 # lr           = 0.1
 # init_std     = 1
 
 device       = 'cuda'
 DB_NAME      = MODEL_NAME
-TASK_NAME    = MODEL_NAME+f".vd={virtual_bond}"
+TASK_NAME    = MODEL_NAME+f".vd={virtual_bond}.W={W}.H={H}"
 transform = transforms.Compose([transforms.ToTensor()])
 
 mnist_train = datasets.MNIST(DATAROOT, train=True, download=False, transform=transform)
@@ -129,8 +136,7 @@ def do_train(model,config_pool,logsys,trial=None,**kargs):
             for accu_type in accu_list:
                 logsys.record(accu_type, valid_acc_pool[accu_type], epoch)
                 logsys.record('best_'+accu_type, metric_dict['best_'+accu_type][accu_type], epoch)
-            logsys.banner_show(epoch,FULLNAME,train_losses=[loss])
-            earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
+             earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
 
         if trial:
             trial.report(metric_dict[accu_list[0]], epoch)
@@ -158,7 +164,8 @@ def objective(trial):
     trial.set_user_attr('trial_name', TRIAL_NOW)
 
 
-    model = PEPS_einsum_uniform_shape_6x6_fast(10,in_physics_bond=16,virtual_bond_dim=virtual_bond,init_std=init_std)
+    model = eval(MODEL_NAME)(W,H,out_features=10,in_physics_bond=16,virtual_bond_dim=virtual_bond,init_std=init_std)
+    print([p.shape for p in model.parameters()])
     device = 'cuda'
     model = model.to(device)
     config_pool= {"project_name":"Uniform_shape_finite_PEPS",
