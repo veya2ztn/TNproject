@@ -51,12 +51,12 @@ def create_templete_2DTN_tn(tn2D_shape_list):
     sublist_list = [[mapper.get_index(e.name)for e in t.edges] for t in node_list]
     outlist = [mapper.get_index(e.name) for e in get_all_dangling(node_list)]
     return node_list,sublist_list,outlist
-def get_optim_path_by_oe_from_tn(node_list):
+def get_optim_path_by_oe_from_tn(node_list,optimize='random-greedy'):
     operands = []
     for node in node_list:
         operands+=[node.tensor,[edge.name for edge in node.edges]]
     operands+= [[edge.name for edge in get_all_dangling(node_list)]]
-    path,info = oe.contract_path(*operands)
+    path,info = oe.contract_path(*operands,optimize=optimize)
     return path,info
 def sub_network_tn(tn2D_shape_list):
     node_array      = []

@@ -21,7 +21,7 @@ if os.path.exists(DATAROOTPATH):
 DATAROOT  = RootDict['DATAROOT']
 SAVEROOT  = RootDict['SAVEROOT']
 EXP_HUB   = RootDict['EXP_HUB']
-MODEL_NAME= "PEPS_einsum_uniform_shape_6x6_fast"
+MODEL_NAME= "PEPS_einsum_arbitrary_shape_optim"
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -109,9 +109,7 @@ def do_train(model,config_pool,logsys,trial=None,**kargs):
         logsys.record('the_lr_use_now', optimizer.param_groups[0]['lr'] , epoch)
         logsys.record('training_loss', loss, epoch)
 
-        bad_condition_happen = logsys.save_latest_ckpt({"model": model},
-                                epoch,train_loss,saveQ=True,
-                                optimizer=optimizer,doearlystop=False)
+        bad_condition_happen = logsys.save_latest_ckpt({"model": model},epoch,train_loss,saveQ=True,optimizer=optimizer,doearlystop=False)
         ### valid phase ########
         if epoch%valid_per_epoch ==0:
             model.eval()
