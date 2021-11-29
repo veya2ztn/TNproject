@@ -109,7 +109,7 @@ def do_train(model,config_pool,logsys,trial=None,**kargs):
         logsys.record('the_lr_use_now', optimizer.param_groups[0]['lr'] , epoch)
         logsys.record('training_loss', loss, epoch)
 
-        bad_condition_happen = logsys.save_latest_ckpt( {"model": model,
+        bad_condition_happen = logsys.save_latest_ckpt({"model": model},
                                 epoch,train_loss,saveQ=True,
                                 optimizer=optimizer,doearlystop=False)
         ### valid phase ########
