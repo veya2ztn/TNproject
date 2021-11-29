@@ -80,6 +80,7 @@ def do_train(model,config_pool,logsys,trial=None,**kargs):
     logsys.Q_batch_loss_record=True
     device     = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
     for epoch in master_bar:
         #if epoch < start_epoch:continue
         ### training phase ########
@@ -107,7 +108,10 @@ def do_train(model,config_pool,logsys,trial=None,**kargs):
         if np.isnan(loss):raise NanValueError
         logsys.record('the_lr_use_now', optimizer.param_groups[0]['lr'] , epoch)
         logsys.record('training_loss', loss, epoch)
-        bad_condition_happen = logsys.save_latest_ckpt(model,epoch,train_loss,saveQ=True,doearlystop=False)
+
+        bad_condition_happen = logsys.save_latest_ckpt( {"model": model,
+                                epoch,train_loss,saveQ=True,
+                                optimizer=optimizer,doearlystop=False)
         ### valid phase ########
         if epoch%valid_per_epoch ==0:
             model.eval()
