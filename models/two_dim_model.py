@@ -58,6 +58,40 @@ def get_optim_path_by_oe_from_tn(node_list):
     operands+= [[edge.name for edge in get_all_dangling(node_list)]]
     path,info = oe.contract_path(*operands)
     return path,info
+def sub_network_tn(tn2D_shape_list):
+    node_array      = []
+    W = len(tn2D_shape_list)
+    H = len(tn2D_shape_list[0])
+    for i in range(W):
+        node_line = []
+        for j in range(H):
+            node = tn.Node(np.random.randn(*tn2D_shape_list[i][j]),name=f"{i}-{j}")
+            node_line.append(node)
+        node_array.append(node_line)
+    #row
+    for i in range(W):
+        for j in range(H-1):
+            tn.connect(node_array[i][j][1],node_array[i][j+1][-1],name=f'{i},{j}|{i},{j+1}')
+    for j in range(H):
+        for i in range(W-1):
+            tn.connect(node_array[i][j][0],node_array[i+1][j][2],name=f'{i},{j}|{i+1},{j}')
+    node_list = [item for sublist in node_array for item in sublist]
+    for edge in get_all_edges(node_list):
+        if edge.name == '__unnamed_edge__':
+            if edge.node1 is not None and edge.node2 is not None:
+                edge.name= f'{edge.node1.name}:{edge.axis1}<->{edge.node2.name}:{edge.axis2}'
+            else:
+                edge.name= f"{edge.node1}:{edge.axis1}"
+    class edges_name_mapper:
+        name_to_idx = {}
+        def get_index(self,name):
+            if name not in self.name_to_idx:
+                self.name_to_idx[name]=len(self.name_to_idx)
+            return self.name_to_idx[name]
+    mapper = edges_name_mapper()
+    sublist_list = [[mapper.get_index(e.name)for e in t.edges] for t in node_list]
+    outlist = [mapper.get_index(e.name) for e in get_all_dangling(node_list)]
+    return node_list,sublist_list,outlist
 
 class PEPS_einsum_uniform_shape(TN_Base):
     def __init__(self, W,H,out_features,
@@ -75,7 +109,7 @@ class PEPS_einsum_uniform_shape(TN_Base):
         self.ipb           = P = in_physics_bond
         self.label_pos_x   = label_pos_x
         self.label_pos_y   = label_pos_y
-
+        self.path_record  = {}
         self.bulk_tensors = nn.Parameter(self.rde2D((     (W-2)*(H-2),P,D,D,D,D),init_std))
         self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std))
         self.corn_tensors = nn.Parameter(self.rde2D(                 (3,P,D,D),init_std))
@@ -219,8 +253,12 @@ class PEPS_einsum_uniform_shape_6x6_fast(PEPS_einsum_uniform_shape):
     def __init__(self,W=6,H=6,out_features=10,**kargs):
         assert W==6
         assert H==6
+        path_record = {}
         super().__init__(6,6,out_features,**kargs)
-
+    def auto_opt_einsum(self,path_id,equation,*batch_input):
+        if path_id not in self.path_record:
+            self.path_record[path_id] = oe.contract_path(equation, *batch_input)[0]
+        return torch.einsum(equation,*batch_input, optimize=self.path_record[path_id])
     def forward(self,input_data):
         bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
         bulk_tensors = torch.einsum("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
@@ -233,13 +271,13 @@ class PEPS_einsum_uniform_shape_6x6_fast(PEPS_einsum_uniform_shape):
         L=2*(W-2)+2*(H-2);edge_index1=[0,(W-2)+1,W-2+2*(H-3),L-1] # [0,5,10,15] for 6x6
         L=(W-2)*(H-2)    ;bulk_index = [0,W-3,(W-2)*(H-3),L-1]# [0,3,12,15] for 6x6
         L=2*(W-2)+2*(H-2);edge_index2=[(W-2),(W-2)-1,L-(W-2),L-(W-2)-1] # [4,3,12,11] for 6x6
-        corner123_contraction = torch.einsum("lkab,lkcdb,lkefcg,lkgah->lkhedf",
+        corner123_contraction = self.auto_opt_einsum(1,"lkab,lkcdb,lkefcg,lkgah->lkhedf",
                                        corn_tensors[corn_index[:3]],
                                        edge_tensors[edge_index1[:3]],
                                        bulk_tensors[bulk_index[:3]],
                                        edge_tensors[edge_index2[:3]],
                                       ).flatten(-4,-3).flatten(-2,-1)
-        corner4_contraction = torch.einsum("okab,kceb,khicg,kfga->okfhei" ,
+        corner4_contraction   = self.auto_opt_einsum(2,"okab,kceb,khicg,kfga->okfhei" ,
                                        cent_tensors,
                                        edge_tensors[edge_index1[-1]],
                                        bulk_tensors[bulk_index[-1]],
@@ -258,14 +296,14 @@ class PEPS_einsum_uniform_shape_6x6_fast(PEPS_einsum_uniform_shape):
         L=(W-2)*(H-2);bulk_index = [W-1,2*(W-2)-2,L-W-(W-2)+3,L-(W)]# [5,6,9,10] for 6x6
         edge_index1 = [0,3,4,7]
         edge_index2 = [2,1,6,5]
-        corner123_contraction = torch.einsum("lkab,lkcdb,lkefcg,lkgah->lkhedf" ,
+        corner123_contraction = self.auto_opt_einsum(3,"lkab,lkcdb,lkefcg,lkgah->lkhedf" ,
                                        corner123_contraction,
                                        edge_fast_contraction[edge_index1[:3]],
                                        bulk_tensors[bulk_index[:3]],
                                        edge_fast_contraction[edge_index2[:3]],
                                       ).flatten(-4,-3).flatten(-2,-1)
 
-        corner4_contraction = torch.einsum("okab,kcdb,kefcg,kgah->okhedf",
+        corner4_contraction = self.auto_opt_einsum(4,"okab,kcdb,kefcg,kgah->okhedf",
                                        corner4_contraction,
                                        edge_fast_contraction[edge_index1[-1]],
                                        bulk_tensors[bulk_index[-1]],
@@ -276,7 +314,162 @@ class PEPS_einsum_uniform_shape_6x6_fast(PEPS_einsum_uniform_shape):
         tensor  = torch.einsum("kab,okba->ko",tensor,corner4_contraction)
         return tensor
 
-class PEPS_einsum_uniform_shape_6x6_fast2(TN_Base):
+class PEPS_einsum_uniform_shape_6x6_fast_one_step(PEPS_einsum_uniform_shape_6x6_fast):
+    def __init__(self, W=6,H=6,out_features=10,virtual_bond_dim=2,**kargs):
+        self.path_1    = None
+        self.path_1    = None
+        self.path_final= None
+        super().__init__(W=W,H=H,out_features=out_features,virtual_bond_dim=virtual_bond_dim,**kargs)
+
+    def forward(self,input_data):
+        bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
+        bulk_tensors = torch.einsum("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
+        edge_tensors = torch.einsum(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
+        corn_tensors = torch.einsum("  lpab,klp->lkab"  ,self.corn_tensors,corn_input)
+        cent_tensors = torch.einsum("   opab,kp->okab"  ,self.cent_tensors,cent_input)
+        #corner_contraction
+        corner123_contraction = self.auto_opt_einsum(1,
+            "xyab,xycdb,xyefd,xygha,xyijch,xyklej,xymng,xyopin,xyqrkp->xymoqflr",
+             corn_tensors[[ 0, 1, 2]] ,
+             edge_tensors[[ 0, 5,10]],
+             edge_tensors[[ 1, 7, 8]],
+             edge_tensors[[ 4, 3,12]],
+             bulk_tensors[[ 0, 3,12]],
+             bulk_tensors[[ 1, 7, 8]],
+             edge_tensors[[ 6, 2,13]],
+             bulk_tensors[[ 4, 2,13]],
+             bulk_tensors[[ 5, 6, 9]]
+            ).flatten(-6,-4).flatten(-3,-1)
+        corner4_contraction = self.auto_opt_einsum(2,
+            "zyab,ycdb,yefd,ygha,yijch,yklej,ymng,yopin,yqrkp->zymoqflr",
+             cent_tensors,#corn_tensors[ 3] ,
+             edge_tensors[15],
+             edge_tensors[14],
+             edge_tensors[11],
+             bulk_tensors[15],
+             bulk_tensors[14],
+             edge_tensors[ 9],
+             bulk_tensors[11],
+             bulk_tensors[10]
+            ).flatten(-6,-4).flatten(-3,-1)
+        tensor  = self.auto_opt_einsum(3,
+                "yab,ybc,ycd,oyda->yo",
+                corner123_contraction[0],
+                corner123_contraction[1],
+                corner123_contraction[2],
+                corner4_contraction)
+        return tensor
+
+
+class PEPS_einsum_uniform_shape_6x6_fast_one_step2(PEPS_einsum_uniform_shape_6x6_fast):
+    def __init__(self, W=6,H=6,out_features=10,virtual_bond_dim=2,**kargs):
+        O = out_features
+        D = virtual_bond_dim
+        assert isinstance(virtual_bond_dim,int)
+
+        L=3
+        tn2D_shape_list = [[(D,D)]+[(D,D,D)]*(L-1)]+[[(D,D,D)]+[(D,D,D,D)]*(L-1)]*(L-1)
+        node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
+        path,info                      = get_optim_path_by_oe_from_tn(node_list)
+        last_idx = outlist.pop()
+        outlist.insert(L-1,last_idx)
+        #outlist should be [5, 11, 17, 12, 14, 16] for 3x3
+        #print(outlist)
+        self.sublist_list_1 = sublist_list
+        self.outlist_1      = outlist
+        self.path_1         = path
+
+        tn2D_shape_list = [[(D,D,O)]+[(D,D,D)]*(L-1)]+[[(D,D,D)]+[(D,D,D,D)]*(L-1)]*(L-1)
+        node_list,sublist_list,outlist =  sub_network_tn(tn2D_shape_list)
+        path,info = get_optim_path_by_oe_from_tn(node_list)
+        last_idx = outlist.pop()
+        outlist.insert(L,last_idx)
+        #print(outlist)
+        #outlist should be [2, 6, 12, 18, 13, 15, 17] for 3x3
+        self.sublist_list_2 = sublist_list
+        self.outlist_2      = outlist
+        self.path_2         = path
+
+        self.path_final     = None
+        super().__init__(W=W,H=H,out_features=out_features,virtual_bond_dim=virtual_bond_dim,**kargs)
+
+    def forward(self,input_data):
+        bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
+        bulk_tensors = torch.einsum("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
+        edge_tensors = torch.einsum(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
+        corn_tensors = torch.einsum("  lpab,klp->lkab"  ,self.corn_tensors,corn_input)
+        cent_tensors = torch.einsum("   opab,kp->kabo"  ,self.cent_tensors,cent_input)
+        #corner_contraction
+        batch_input = [ corn_tensors[[ 0, 1, 2]] ,
+                        edge_tensors[[ 0, 5,10]],
+                        edge_tensors[[ 1, 7, 8]],
+                        edge_tensors[[ 4, 3,12]],
+                        bulk_tensors[[ 0, 3,12]],
+                        bulk_tensors[[ 1, 7, 8]],
+                        edge_tensors[[ 6, 2,13]],
+                        bulk_tensors[[ 4, 2,13]],
+                        bulk_tensors[[ 5, 6, 9]]
+                      ]
+        operands=[]
+        for tensor,sublist in zip(batch_input,self.sublist_list_1):
+            operand = [tensor,[...,*sublist]]
+            operands+=operand
+        operands+= [[...,*self.outlist_1]]
+        corner123_contraction =  torch.einsum(*operands,optimize=self.path_1
+                                            ).flatten(-6,-4).flatten(-3,-1)
+        # corner123_contraction = torch.einsum(
+        #     "xyab,xycdb,xyefd,xygha,xyijch,xyklej,xymng,xyopin,xyqrkp->xymoqflr",
+        #      corn_tensors[[ 0, 1, 2]] ,
+        #      edge_tensors[[ 0, 5,10]],
+        #      edge_tensors[[ 1, 7, 8]],
+        #      edge_tensors[[ 4, 3,12]],
+        #      bulk_tensors[[ 0, 3,12]],
+        #      bulk_tensors[[ 1, 7, 8]],
+        #      edge_tensors[[ 6, 2,13]],
+        #      bulk_tensors[[ 4, 2,13]],
+        #      bulk_tensors[[ 5, 6, 9]]
+        #     ).flatten(-6,-4).flatten(-3,-1)
+        batch_input = [ cent_tensors,#corn_tensors[ 3] ,
+                        edge_tensors[15],
+                        edge_tensors[14],
+                        edge_tensors[11],
+                        bulk_tensors[15],
+                        bulk_tensors[14],
+                        edge_tensors[ 9],
+                        bulk_tensors[11],
+                        bulk_tensors[10]
+                      ]
+        operands=[]
+        for tensor,sublist in zip(batch_input,self.sublist_list_2):
+            operand = [tensor,[...,*sublist]]
+            operands+=operand
+        operands+= [[...,*self.outlist_2]]
+        corner4_contraction =  torch.einsum(*operands,optimize=self.path_2
+                                            ).flatten(-6,-4).flatten(-3,-1)
+        # corner4_contraction = torch.einsum(
+        #     "zyab,ycdb,yefd,ygha,yijch,yklej,ymng,yopin,yqrkp->zymoqflr",
+        #      cent_tensors,#corn_tensors[ 3] ,
+        #      edge_tensors[15],
+        #      edge_tensors[14],
+        #      edge_tensors[11],
+        #      bulk_tensors[15],
+        #      bulk_tensors[14],
+        #      edge_tensors[ 9],
+        #      bulk_tensors[11],
+        #      bulk_tensors[10]
+        #     ).flatten(-6,-4).flatten(-3,-1)
+        equation = "yab,ybc,ycd,yoda->yo"
+        tensor_l = [ corner123_contraction[0],
+                     corner123_contraction[1],
+                     corner123_contraction[2],
+                     corner4_contraction]
+        if self.path_final is None:
+            self.path_final = oe.contract_path(equation, *tensor_l)[0]
+        tensor  = torch.einsum(equation,*tensor_l, optimize=self.path_final)
+
+        return tensor
+
+class PEPS_einsum_uniform_shape_6x6_all_together(TN_Base):
     def __init__(self, W=6, H=6 ,out_features=10,
                        in_physics_bond = 2, virtual_bond_dim=2,
                        bias=True,label_position='center',init_std=1e-10,contraction_mode = 'recursion'):
@@ -332,54 +525,7 @@ class PEPS_einsum_uniform_shape_6x6_fast2(TN_Base):
         operands+= [[...,*self.outlist]]
         return torch.einsum(*operands,optimize=self.path)
 
-
-class PEPS_einsum_uniform_shape_6x6_fast_one_step(PEPS_einsum_uniform_shape_6x6_fast):
-    def __init__(self, out_features,**kargs):
-        super().__init__(out_features,**kargs)
-
-    def forward(self,input_data):
-        bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
-        bulk_tensors = torch.einsum("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
-        edge_tensors = torch.einsum(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
-        corn_tensors = torch.einsum("  lpab,klp->lkab"  ,self.corn_tensors,corn_input)
-        cent_tensors = torch.einsum("   opab,kp->okab"  ,self.cent_tensors,cent_input)
-        #corner_contraction
-        corner123_contraction = torch.einsum(
-            "xyab,xycdb,xyefd,xygha,xyijch,xyklej,xymng,xyopin,xyqrkp->xymoqflr",
-             corn_tensors[[ 0, 1, 2]] ,
-             edge_tensors[[ 0, 5,10]],
-             edge_tensors[[ 1, 7, 8]],
-             edge_tensors[[ 4, 3,12]],
-             bulk_tensors[[ 0, 3,12]],
-             bulk_tensors[[ 1, 7, 8]],
-             edge_tensors[[ 6, 2,13]],
-             bulk_tensors[[ 4, 2,13]],
-             bulk_tensors[[ 5, 6, 9]]
-            ).flatten(-6,-4).flatten(-3,-1)
-
-        corner4_contraction = torch.einsum(
-            "zyab,ycdb,yefd,ygha,yijch,yklej,ymng,yopin,yqrkp->zymoqflr",
-             cent_tensors,#corn_tensors[ 3] ,
-             edge_tensors[15],
-             edge_tensors[14],
-             edge_tensors[11],
-             bulk_tensors[15],
-             bulk_tensors[14],
-             edge_tensors[ 9],
-             bulk_tensors[11],
-             bulk_tensors[10]
-            ).flatten(-6,-4).flatten(-3,-1)
-
-        tensor  = torch.einsum("yab,ybc,ycd,oyda->yo",
-                               corner123_contraction[0],
-                               corner123_contraction[1],
-                               corner123_contraction[2],
-                               corner4_contraction)
-
-        return tensor
-
-
-class PEPS_einsum_arbitrary_shape_fast(TN_Base):
+class PEPS_einsum_arbitrary_shape_optim(TN_Base):
     def __init__(self, W, H ,out_features=10,
                        in_physics_bond = 2, virtual_bond_dim=2,
                        bias=True,label_position='center',init_std=1e-10,contraction_mode = 'recursion'):

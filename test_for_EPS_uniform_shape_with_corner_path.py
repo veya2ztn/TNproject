@@ -3,10 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from utils import preprocess_sincos, preprocess_binary,aggregation_patch
-from models.two_dim_model import (PEPS_einsum_uniform_shape,
-                                  PEPS_einsum_uniform_shape_6x6_fast,
-                                  PEPS_einsum_arbitrary_shape_fast,
-                                  PEPS_einsum_uniform_shape_6x6_fast2)
+from models.two_dim_model import *
 import random,time,os
 from optuna.trial import TrialState
 def preprocess_images(x):
@@ -80,7 +77,7 @@ def do_train(model,config_pool,logsys,trial=None,**kargs):
     logsys.banner_show(start_epoch,FULLNAME)
     logsys.train_bar  = logsys.create_progress_bar(1,unit=' img',unit_scale=train_loader.batch_size)
     logsys.valid_bar  = logsys.create_progress_bar(1,unit=' img',unit_scale=valid_loader.batch_size)
-
+    logsys.Q_batch_loss_record=True
     device     = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     for epoch in master_bar:
@@ -136,7 +133,7 @@ def do_train(model,config_pool,logsys,trial=None,**kargs):
             for accu_type in accu_list:
                 logsys.record(accu_type, valid_acc_pool[accu_type], epoch)
                 logsys.record('best_'+accu_type, metric_dict['best_'+accu_type][accu_type], epoch)
-             earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
+            earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
 
         if trial:
             trial.report(metric_dict[accu_list[0]], epoch)
@@ -165,7 +162,7 @@ def objective(trial):
 
 
     model = eval(MODEL_NAME)(W,H,out_features=10,in_physics_bond=16,virtual_bond_dim=virtual_bond,init_std=init_std)
-    print([p.shape for p in model.parameters()])
+    #print([p.shape for p in model.parameters()])
     device = 'cuda'
     model = model.to(device)
     config_pool= {"project_name":"Uniform_shape_finite_PEPS",
