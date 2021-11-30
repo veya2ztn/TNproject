@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import opt_einsum as oe
 class TN_Base(nn.Module):
     @staticmethod
     def rde1(shape,init_std):
@@ -15,13 +16,29 @@ class TN_Base(nn.Module):
         return tensor
 
     @staticmethod
-    def rde2D(shape,init_std,offset=2):
+    def rde2D2(shape,init_std,offset=2):
         size_shape = shape[:offset]
         bias_shape = shape[offset:]
         bias_mat   = torch.zeros(bias_shape)
         diag_idx   = [list(range(min(bias_shape)))]*len(bias_shape)
         bias_mat[diag_idx] = 1
         for i in range(offset):bias_mat=bias_mat.unsqueeze(0)
+        bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
+        tensor     = init_std * torch.randn(*shape)+ bias_mat
+        return tensor
+    @staticmethod
+    def rde2D(shape,init_std,offset=2):
+        size_shape = shape[:offset]
+        bias_shape = shape[offset:]
+        if len(bias_shape) ==2 :
+            bias_mat   = torch.eye(*bias_shape)
+        elif len(bias_shape) == 3:
+            a,b,c   = bias_shape
+            bias_mat   = torch.kron(torch.ones(a),torch.eye(b,c)).reshape(a,b,c)
+        elif len(bias_shape) == 4:
+            a,b,c,d   = bias_shape
+            bias_mat   = torch.kron(torch.ones(a,b),torch.eye(c,d)).reshape(a,b,c,d)
+
         bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
         tensor     = init_std * torch.randn(*shape)+ bias_mat
         return tensor
@@ -82,3 +99,20 @@ class TN_Base(nn.Module):
         for next_tensor in tensor[1:]:
             now_tensor = torch.einsum("ik,kj->ij",now_tensor, next_tensor)
         return now_tensor
+
+    @staticmethod
+    def flatten_image_input(batch_image_input):
+        bulk_input = batch_image_input[...,1:-1,1:-1,:].flatten(1,2)
+        edge_input = torch.cat([batch_image_input[...,0,1:-1,:],
+                                batch_image_input[...,1:-1,[0,-1],:].flatten(-3,-2),
+                                batch_image_input[...,-1,1:-1,:]
+                               ],1)
+        corn_input = batch_image_input[...,[0,0,-1],[0,-1,0],:]
+        cent_input = batch_image_input[...,-1,-1,:]
+        return bulk_input,edge_input,corn_input,cent_input
+
+    def auto_opt_einsum(self,path_id,equation,*batch_input):
+        if not hasattr(self,'path_record'):self.path_record={}
+        if path_id not in self.path_record:
+            self.path_record[path_id] = oe.contract_path(equation, *batch_input)[0]
+        return torch.einsum(equation,*batch_input, optimize=self.path_record[path_id])

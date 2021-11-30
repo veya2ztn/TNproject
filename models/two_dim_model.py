@@ -1,97 +1,7 @@
-from models.tensornetwork_base import *
-import numpy as np
-import tensornetwork as tn
-tn.set_default_backend("numpy")
+from .tensornetwork_base import *
+from .model_utils import *
 import opt_einsum as oe
-from tensornetwork.network_components import get_all_nondangling,get_all_dangling
-from tensornetwork.contractors.opt_einsum_paths.utils import get_subgraph_dangling,get_all_edges
-def create_templete_2DTN_tn(tn2D_shape_list):
-    node_array      = []
-    W = len(tn2D_shape_list)
-    H = len(tn2D_shape_list[0])
-    for i in range(W):
-        node_line = []
-        for j in range(H):
-            node = tn.Node(np.random.randn(*tn2D_shape_list[i][j]),name=f"{i}-{j}")
-            node_line.append(node)
-        node_array.append(node_line)
-    #row
-    for i in range(W-1):
-        for j in range(H-1):
-            tn.connect(node_array[i][j][1],node_array[i][j+1][-1],name=f'{i},{j}|{i},{j+1}')
-    #last row
-    i=W-1
-    for j in range(H-1):
-            tn.connect(node_array[i][j][0],node_array[i][j+1][-1],name=f'{i},{j}|{i},{j+1}')
-    #col
-    for j in range(H-1):
-        for i in range(W-2):
-            tn.connect(node_array[i][j][0],node_array[i+1][j][2],name=f'{i},{j}|{i+1},{j}')
-        i=W-2
-        tn.connect(node_array[i][j][0],node_array[i+1][j][1],name=f'{i},{j}|{i+1},{j}')
-    j = H-1
-    for i in range(W-2):
-        tn.connect(node_array[i][j][0],node_array[i+1][j][1],name=f'{i},{j}|{i+1},{j}')
-    i=W-2
-    tn.connect(node_array[i][j][0],node_array[i+1][j][0],name=f'{i},{j}|{i+1},{j}')
-    node_list = [item for sublist in node_array for item in sublist]
-    for edge in get_all_edges(node_list):
-        if edge.name == '__unnamed_edge__':
-            if edge.node1 is not None and edge.node2 is not None:
-                edge.name= f'{edge.node1.name}:{edge.axis1}<->{edge.node2.name}:{edge.axis2}'
-            else:
-                edge.name= f"{edge.node1}:{edge.axis1}"
-    class edges_name_mapper:
-        name_to_idx = {}
-        def get_index(self,name):
-            if name not in self.name_to_idx:
-                self.name_to_idx[name]=len(self.name_to_idx)
-            return self.name_to_idx[name]
-    mapper = edges_name_mapper()
-    sublist_list = [[mapper.get_index(e.name)for e in t.edges] for t in node_list]
-    outlist = [mapper.get_index(e.name) for e in get_all_dangling(node_list)]
-    return node_list,sublist_list,outlist
-def get_optim_path_by_oe_from_tn(node_list,optimize='random-greedy'):
-    operands = []
-    for node in node_list:
-        operands+=[node.tensor,[edge.name for edge in node.edges]]
-    operands+= [[edge.name for edge in get_all_dangling(node_list)]]
-    path,info = oe.contract_path(*operands,optimize=optimize)
-    return path,info
-def sub_network_tn(tn2D_shape_list):
-    node_array      = []
-    W = len(tn2D_shape_list)
-    H = len(tn2D_shape_list[0])
-    for i in range(W):
-        node_line = []
-        for j in range(H):
-            node = tn.Node(np.random.randn(*tn2D_shape_list[i][j]),name=f"{i}-{j}")
-            node_line.append(node)
-        node_array.append(node_line)
-    #row
-    for i in range(W):
-        for j in range(H-1):
-            tn.connect(node_array[i][j][1],node_array[i][j+1][-1],name=f'{i},{j}|{i},{j+1}')
-    for j in range(H):
-        for i in range(W-1):
-            tn.connect(node_array[i][j][0],node_array[i+1][j][2],name=f'{i},{j}|{i+1},{j}')
-    node_list = [item for sublist in node_array for item in sublist]
-    for edge in get_all_edges(node_list):
-        if edge.name == '__unnamed_edge__':
-            if edge.node1 is not None and edge.node2 is not None:
-                edge.name= f'{edge.node1.name}:{edge.axis1}<->{edge.node2.name}:{edge.axis2}'
-            else:
-                edge.name= f"{edge.node1}:{edge.axis1}"
-    class edges_name_mapper:
-        name_to_idx = {}
-        def get_index(self,name):
-            if name not in self.name_to_idx:
-                self.name_to_idx[name]=len(self.name_to_idx)
-            return self.name_to_idx[name]
-    mapper = edges_name_mapper()
-    sublist_list = [[mapper.get_index(e.name)for e in t.edges] for t in node_list]
-    outlist = [mapper.get_index(e.name) for e in get_all_dangling(node_list)]
-    return node_list,sublist_list,outlist
+import numpy as np
 
 class PEPS_einsum_uniform_shape(TN_Base):
     def __init__(self, W,H,out_features,
@@ -114,22 +24,6 @@ class PEPS_einsum_uniform_shape(TN_Base):
         self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std))
         self.corn_tensors = nn.Parameter(self.rde2D(                 (3,P,D,D),init_std))
         self.cent_tensors = nn.Parameter(self.rde2D(                 (O,P,D,D),init_std))
-    @staticmethod
-    def rde2D(shape,init_std,offset=2):
-        size_shape = shape[:offset]
-        bias_shape = shape[offset:]
-        if len(bias_shape) ==2 :
-            bias_mat   = torch.eye(*bias_shape)
-        elif len(bias_shape) == 3:
-            a,b,c   = bias_shape
-            bias_mat   = torch.kron(torch.ones(a),torch.eye(b,c)).reshape(a,b,c)
-        elif len(bias_shape) == 4:
-            a,b,c,d   = bias_shape
-            bias_mat   = torch.kron(torch.ones(a,b),torch.eye(c,d)).reshape(a,b,c,d)
-
-        bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
-        tensor     = init_std * torch.randn(*shape)+ bias_mat
-        return tensor
 
     def mpo_line(self,i,bulk_tensors,edge_tensors,corn_tensors,cent_tensors):
         W=self.W
@@ -140,7 +34,6 @@ class PEPS_einsum_uniform_shape(TN_Base):
             return  corn_tensors[2],edge_tensors[-(W-2):],cent_tensors
         else:
             return  edge_tensors[W-4+2*i],bulk_tensors[(W-2)*(i-1):(W-2)*i],edge_tensors[W-4+2*i+1]
-
 
     @staticmethod
     def batch_contract_mps_mpo(mps_list,mpo_list):
@@ -212,16 +105,6 @@ class PEPS_einsum_uniform_shape(TN_Base):
         new_mps_list.append(tensor)
         return new_mps_list
 
-    @staticmethod
-    def flatten_image_input(batch_image_input):
-        bulk_input = batch_image_input[...,1:-1,1:-1,:].flatten(1,2)
-        edge_input = torch.cat([batch_image_input[...,0,1:-1,:],
-                                batch_image_input[...,1:-1,[0,-1],:].flatten(-3,-2),
-                                batch_image_input[...,-1,1:-1,:]
-                               ],1)
-        corn_input = batch_image_input[...,[0,0,-1],[0,-1,0],:]
-        cent_input = batch_image_input[...,-1,-1,:]
-        return bulk_input,edge_input,corn_input,cent_input
 
     def forward(self, input_data,contraction_mode='top2bot',batch_method='physics_index_first'):
         # the input data shape is (B,L,L,pd)
@@ -255,10 +138,6 @@ class PEPS_einsum_uniform_shape_6x6_fast(PEPS_einsum_uniform_shape):
         assert H==6
         path_record = {}
         super().__init__(6,6,out_features,**kargs)
-    def auto_opt_einsum(self,path_id,equation,*batch_input):
-        if path_id not in self.path_record:
-            self.path_record[path_id] = oe.contract_path(equation, *batch_input)[0]
-        return torch.einsum(equation,*batch_input, optimize=self.path_record[path_id])
     def forward(self,input_data):
         bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
         bulk_tensors = torch.einsum("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
@@ -525,6 +404,121 @@ class PEPS_einsum_uniform_shape_6x6_all_together(TN_Base):
         operands+= [[...,*self.outlist]]
         return torch.einsum(*operands,optimize=self.path)
 
+
+class PEPS_uniform_shape_symmetry_base(TN_Base):
+    def __init__(self, W=6,H=6,out_features=10,
+                       in_physics_bond = 2, virtual_bond_dim=2,
+                       init_std=1e-10):
+        super().__init__()
+        assert (W % 2 == 0) and (H % 2 == 0) and (W == H)
+        self.W             = W
+        self.H             = H
+        self.out_features  = out_features
+        O                  = np.power(16,1/4)
+        assert np.ceil(O) == np.floor(O)
+        self.O             = O = O.astype('uint')
+        self.vbd           = D = virtual_bond_dim
+        self.ipb           = P = in_physics_bond
+
+        self.corn_tensors = nn.Parameter(self.rde2D( (4,O,P,D,D),init_std))
+        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std))
+        self.bulk_tensors = nn.Parameter(self.rde2D( ((W-2)*(H-2),P,D,D,D,D),init_std))
+
+class PEPS_uniform_shape_symmetry_any(PEPS_uniform_shape_symmetry_base):
+    def __init__(self, **kargs):
+        super().__init__(**kargs)
+        W = self.W;
+        H = self.H
+        O = self.O
+        P = self.P
+        self.LW = LW = W//2
+        self.LH = LH = H//2
+        tn2D_shape_list                = [ [(D,D,O)]+[  (D,D,D)]*(LH-1) ]+ \
+                                         [ [(D,D,D)]+[(D,D,D,D)]*(LH-1)]*(LW-1)
+        node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
+        path,info                      = get_optim_path_by_oe_from_tn(node_list)
+        last_idx = outlist.pop()
+        outlist.insert(LH,last_idx)
+        #print(outlist)
+        #outlist should be [2, 6, 12, 18, 13, 15, 17] for 3x3
+        self.sublist_list = sublist_list
+        self.outlist      = outlist
+        self.path         = path
+
+        self.path_record  = {}
+        self.path_final= None
+    def forward(self,input_data):
+        bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
+        corn_input   = torch.cat([corn_input,cent_input.unsqueeze(1)],1)
+        bulk_tensors = torch.einsum("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
+        edge_tensors = torch.einsum(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
+        corn_tensors = torch.einsum("  lopab,klp->lkabo" ,self.corn_tensors,corn_input)
+        L = len(bulk_tensors)
+        remain = bulk_tensors.shape[1:]
+        bulk_tensors = bulk_tensors.reshape(4,L//4,*remain)
+
+        L = len(edge_tensors)
+        remain = edge_tensors.shape[1:]
+        edge_tensors = edge_tensors.reshape(4,L//4,*remain)
+
+        LH = self.LH
+        LW = self.LW
+        tensor_list  =[[corn_tensors]        + list(edge_tensors[:LH-1]) ]+\
+                      [[edge_tensors[LH-1+i]]+ list(bulk_tensors[(LH-1)*i:(LH-1)*(i+1)])
+                                                                    for i in range(LW-1)]
+        tensor_list     = [l for t in tensor_list for l in t]
+        assert len(tensor_list)==len(self.sublist_list)
+        operands=[]
+        for tensor,sublist in zip(tensor_list,self.sublist_list):
+            operand = [tensor,[...,*self.sublist_list]]
+            operands+=operand
+        operands+= [[...,*self.outlist]]
+        # in this case W==H , LW==LH
+        quater_contraction = torch.einsum(*operands,optimize=self.path).flatten(-2*LW,-LW-1).flatten(-LW,-1)
+
+        tensor  = torch.einsum("lkmab,lknbc->lkmnac",
+                              quater_contraction[[0,2]],quater_contraction[[1,3]]
+                              ).flatten(-4,-3)# -> (2,B,O^2,D^3,D^3)
+        tensor  = torch.einsum("kmab,knba->kmn",
+                              tensor[0],tensor[1]
+                              ).flatten(-2,-1)# -> (B,O^4)
+        return tensor
+
+class PEPS_uniform_shape_symmetry_6x6(PEPS_uniform_shape_symmetry_base):
+    '''
+    same performance as PEPS_uniform_shape_symmetry_any(W=6,H=6    )
+    '''
+    def __init__(self, W=6,H=6,**kargs):
+        assert (W == 6) and (H == 6)
+        super().__init__(W=6,H=6,**kargs)
+    def forward(self,input_data):
+        bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
+        corn_input   = torch.cat([corn_input,cent_input.unsqueeze(1)],1)
+        bulk_tensors = torch.einsum("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
+        edge_tensors = torch.einsum(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
+        corn_tensors = torch.einsum(" lopab,klp->lkoab" ,self.corn_tensors,corn_input)
+
+        quater_contraction = self.auto_opt_einsum(1,
+            "xyzab,xycdb,xyefd,xygha,xyijch,xyklej,xymng,xyopin,xyqrkp->xyzmoqflr",
+            corn_tensors[[ 0, 1, 2, 3]] ,
+            edge_tensors[[ 0, 5,10,15]],
+            edge_tensors[[ 1, 7, 8,14]],
+            edge_tensors[[ 4, 3,12,11]],
+            bulk_tensors[[ 0, 3,12,15]],
+            bulk_tensors[[ 1, 7, 8,14]],
+            edge_tensors[[ 6, 2,13, 9]],
+            bulk_tensors[[ 4, 2,13,11]],
+            bulk_tensors[[ 5, 6, 9,10]]
+            ).flatten(-6,-4).flatten(-3,-1)
+        tensor  = torch.einsum("lkmab,lknbc->lkmnac",
+                              quater_contraction[[0,2]],quater_contraction[[1,3]]
+                              ).flatten(-4,-3)# -> (2,B,O^2,D^3,D^3)
+        tensor  = torch.einsum("kmab,knba->kmn",
+                              tensor[0],tensor[1]
+                              ).flatten(-2,-1)# -> (B,O^4)
+        return tensor
+
+
 class PEPS_einsum_arbitrary_shape_optim(TN_Base):
     def __init__(self, W, H ,out_features=10,
                        in_physics_bond = 2, virtual_bond_dim=2,
@@ -550,10 +544,17 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         virtual_bond_dim[label_x][label_y] = tuple(origin_shape)
 
         node_list,sublist_list,outlist =  create_templete_2DTN_tn(virtual_bond_dim)
-        path,info = get_optim_path_by_oe_from_tn(node_list)
+        path  = read_path_from_offline(virtual_bond_dim)
+        if path is None:
+            print("no offline path find, we generate one, note not gurantee best")
+            path,info = get_optim_path_by_oe_from_tn(node_list)
+        else:
+            print("offline path finded~!" )
+            path = path['path']
+        self.path         = path
         self.sublist_list = sublist_list
         self.outlist      = outlist
-        self.path         = path
+
 
         unit_list      = [self.rde2D((P,*l),init_std,offset=1) for t in virtual_bond_dim for l in t]
         # the last one get out put feature, so initial independent.
@@ -563,6 +564,10 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         self.unit_list = [nn.Parameter(v) for v in unit_list]
         for i, v in enumerate(self.unit_list):
             self.register_parameter(f'unit_{i//W}-{i%W}', param=v)
+
+
+
+
     def forward(self,input_data):
         #input data shape B,W,H,P
         input_data  = input_data.flatten(1,2)

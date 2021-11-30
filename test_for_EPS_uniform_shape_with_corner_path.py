@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torchvision import datasets, transforms
 from utils import preprocess_sincos, preprocess_binary,aggregation_patch
 from models.two_dim_model import *
+from models.extend_model import *
 import random,time,os
 from optuna.trial import TrialState
 def preprocess_images(x):
@@ -21,7 +22,7 @@ if os.path.exists(DATAROOTPATH):
 DATAROOT  = RootDict['DATAROOT']
 SAVEROOT  = RootDict['SAVEROOT']
 EXP_HUB   = RootDict['EXP_HUB']
-MODEL_NAME= "PEPS_einsum_arbitrary_shape_optim"
+MODEL_NAME= "LinearCombineModel1"
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -163,7 +164,7 @@ def objective(trial):
     trial.set_user_attr('trial_name', TRIAL_NOW)
 
 
-    model = eval(MODEL_NAME)(W,H,out_features=10,in_physics_bond=16,virtual_bond_dim=virtual_bond,init_std=init_std)
+    model = eval(MODEL_NAME)(W=W,H=H,out_features=10,in_physics_bond=16,virtual_bond_dim=virtual_bond,init_std=init_std)
     #print([p.shape for p in model.parameters()])
     device = 'cuda'
     model = model.to(device)
