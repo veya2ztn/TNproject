@@ -126,3 +126,78 @@ def get_chain_contraction(tensor):
         tensor   = torch.cat([tensor, leftover], axis=0)
         size     = half_size + int(size % 2 == 1)
     return tensor.squeeze(0)
+
+
+def batch_contract_mps_mpo(mps_list,mpo_list):
+    # mps_list                                    --D--|--D--
+    # (D,D)-(D,D,D)-(D,D,D)-...-(D,D,D)-(D,D)          D
+    #  -b-    -c-  -b-   -c-  -b-     -b-
+    # |a         |a         |a          |a
+    # the order i.e. 'abcd' counterclockwise and start from the down index. (so down index must a )
+    #  mpo_list
+    # (P,D,P)-(D,P,D,P)-(D,P,D,P)-...-(D,P,D,P)-(D,P,P)
+    #  |c            |c        |c           |b
+    #   -b-      -d-  -b-  -d-  -b-     -c-
+    # |a            |a        |a           |a
+    assert len(mps_list) > 2
+    assert len(mpo_list) > 2
+    stack_unit_mps = (len(mps_list)==3 and len(mps_list[0].shape)+ 2 == len(mps_list[1].shape))
+    stack_unit_mpo = (len(mpo_list)==3 and len(mpo_list[0].shape)+ 2 == len(mpo_list[1].shape))
+    mps_left,mps_rigt = mps_list[0],mps_list[-1]
+    mpo_left,mpo_rigt = mpo_list[0],mpo_list[-1]
+    new_mps_list= []
+    tensor = torch.einsum("  kab,kcda->kcbd",mps_left,mpo_left).flatten(-2,-1)
+    new_mps_list.append(tensor)
+    if stack_unit_mps and stack_unit_mpo:
+        mps_inne = mps_list[1]
+        mpo_inne = mpo_list[1]
+        tensor = torch.einsum("lkabc,lkdeaf->lkdbecf",mps_inne,mpo_inne).flatten(-4,-3).flatten(-2,-1)
+        new_mps_list.append(tensor)
+    else:
+        mps_inne = mps_list[1:-1] if not stack_unit_mps else list(*mps_list[1])
+        mpo_inne = mpo_list[1:-1] if not stack_unit_mpo else list(*mpo_list[1])
+        for mps,mpo in zip(mps_inne,mpo_inne):
+            tensor =torch.einsum("kabc,kdeaf->kdebcf",mps,mpo).flatten(-4,-3).flatten(-2,-1)
+            new_mps_list.append(tensor)
+    if len(mpo_rigt.shape)==4:
+        tensor = torch.einsum("  kab,kcad->kcbd",mps_rigt,mpo_rigt).flatten(-2,-1)
+    elif len(mpo_rigt.shape)==5:
+        tensor = torch.einsum("  kab,kocad->kocbd",mps_rigt,mpo_rigt).flatten(-2,-1)
+    else:raise NotImplementedError
+    new_mps_list.append(tensor)
+    return new_mps_list
+
+
+def batch_contract_mps_mps(mps_list,mpo_list):
+    # mps_list                                    --D--|--D--
+    # (D,D)-(D,D,D)-(D,D,D)-...-(D,D,D)-(D,D)          D
+    # (D,D)-(D,D,D)-(D,D,D)-...-(D,D,D)-(D,D,O)
+    #  -b-    -c-  -b-   -c-  -b-     -b-
+    # |a         |a         |a          |a
+    #
+    # |b            |b        |b        |b
+    #  -a-      -c-  -a-  -c-  -a-   -c- -a
+    assert len(mps_list) > 2
+    assert len(mpo_list) > 2
+    stack_unit_mps = (len(mps_list)==3 and len(mps_list[0].shape)+ 2 == len(mps_list[1].shape))
+    stack_unit_mpo = (len(mpo_list)==3 and len(mpo_list[0].shape)+ 2 == len(mpo_list[1].shape))
+    mps_left,mps_rigt = mps_list[0],mps_list[-1]
+    mpo_left,mpo_rigt = mpo_list[0],mpo_list[-1]
+    new_mps_list= []
+    tensor = torch.einsum("  kab,kca->kbc",mps_left,mpo_left).flatten(-2,-1)
+    new_mps_list.append(tensor)
+    if stack_unit_mps and stack_unit_mpo:
+        mps_inne = mps_list[1]
+        mpo_inne = mpo_list[1]
+        tensor = torch.einsum("lkabc,lkdae->lkbdce",mps_inne,mpo_inne).flatten(-4,-3).flatten(-2,-1)
+        new_mps_list.append(tensor)
+    else:
+        mps_inne = mps_list[1:-1] if not stack_unit_mps else list(*mps_list[1])
+        mpo_inne = mpo_list[1:-1] if not stack_unit_mpo else list(*mpo_list[1])
+        for mps,mpo in zip(mps_inne,mpo_inne):
+            tensor =torch.einsum("kabc,kdae->kbdce",mps,mpo).flatten(-4,-3).flatten(-2,-1)
+            new_mps_list.append(tensor)
+    tensor = torch.einsum("  kab,okac->kobc",mps_rigt,mpo_rigt).flatten(-2,-1)
+
+    new_mps_list.append(tensor)
+    return new_mps_list

@@ -13,6 +13,7 @@ import numpy as  np
 from mltool.dataaccelerate import DataSimfetcher
 from mltool.loggingsystem import LoggingSystem
 import json
+
 DATAROOTPATH = f"{os.path.dirname(os.path.realpath(__file__))}/.DATARoot.json"
 print(DATAROOTPATH)
 if os.path.exists(DATAROOTPATH):
@@ -22,7 +23,7 @@ if os.path.exists(DATAROOTPATH):
 DATAROOT  = RootDict['DATAROOT']
 SAVEROOT  = RootDict['SAVEROOT']
 EXP_HUB   = RootDict['EXP_HUB']
-MODEL_NAME= "LinearCombineModel1"
+MODEL_NAME= "PEPS_einsum_uniform_shape_boundary_2direction"
 
 import argparse
 parser = argparse.ArgumentParser()
