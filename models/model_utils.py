@@ -96,6 +96,7 @@ def sub_network_tn(tn2D_shape_list):
     sublist_list = [[mapper.get_index(e.name)for e in t.edges] for t in node_list]
     outlist = [mapper.get_index(e.name) for e in get_all_dangling(node_list)]
     return node_list,sublist_list,outlist
+
 def read_path_from_offline(shape_array):
     with open("models/arbitrary_shape_path_recorder.json",'r') as f:
         path_pool = json.load(f)
@@ -115,6 +116,61 @@ def convert_array_shape_to_string(array_shape):
     '''
     return "|".join([",".join([str(t) for t in line]) for line in array_shape])
 
+def get_best_path(tn2D_shape_list,store=None,type='sub'):
+    saveQ = False
+    path_store_path = None
+    if store is None:
+        node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list) if type =='sub' else create_templete_2DTN_tn(tn2D_shape_list)
+        path,info                      = get_optim_path_by_oe_from_tn(node_list)
+    else:
+        array_string=convert_array_shape_to_string(tn2D_shape_list)
+        if isinstance(store,str):
+            path_store_path = store
+            if os.path.exists(path_store_path):
+                with open(path_store_path,'r') as f:store = json.load(f)
+            else:
+                store={}
+        assert isinstance(store,dict)
+        if array_string not in store:
+            node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list) if type =='sub' else create_templete_2DTN_tn(tn2D_shape_list)
+            path,info                      = get_optim_path_by_oe_from_tn(node_list)
+            store[array_string]={}
+            store[array_string]['path']=path
+            store[array_string]['outlist']=outlist
+            store[array_string]['sublist_list']=sublist_list
+            saveQ = True
+        path        = store[array_string]['path']
+        sublist_list= store[array_string]['sublist_list']
+        outlist     = store[array_string]['outlist']
+        if saveQ and path_store_path is not None:
+            with open(path_store_path,'w') as f:
+                json.dump(store,f)
+    return path,sublist_list,outlist
+
+def get_best_path_via_oe(equation,tensor_l,store=None):
+    saveQ = False
+    path_store_path = None
+    if store is None:
+        path = oe.contract_path(equation, *tensor_l)[0]
+    else:
+        array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
+        if isinstance(store,str):
+            path_store_path = store
+            if os.path.exists(path_store_path):
+                with open(path_store_path,'r') as f:store = json.load(f)
+            else:
+                store={}
+        assert isinstance(store,dict)
+        if array_string not in store:
+            path = oe.contract_path(equation, *tensor_l)[0]
+            store[array_string]={}
+            store[array_string]['path']=path
+            saveQ = True
+        path        = store[array_string]['path']
+        if saveQ and path_store_path is not None:
+            with open(path_store_path,'w') as f:
+                json.dump(store,f)
+    return path
 def get_chain_contraction(tensor):
     size   = int(tensor.shape[0])
     while size > 1:
@@ -126,8 +182,6 @@ def get_chain_contraction(tensor):
         tensor   = torch.cat([tensor, leftover], axis=0)
         size     = half_size + int(size % 2 == 1)
     return tensor.squeeze(0)
-
-
 def batch_contract_mps_mpo(mps_list,mpo_list):
     # mps_list                                    --D--|--D--
     # (D,D)-(D,D,D)-(D,D,D)-...-(D,D,D)-(D,D)          D
@@ -166,8 +220,6 @@ def batch_contract_mps_mpo(mps_list,mpo_list):
     else:raise NotImplementedError
     new_mps_list.append(tensor)
     return new_mps_list
-
-
 def batch_contract_mps_mps(mps_list,mpo_list):
     # mps_list                                    --D--|--D--
     # (D,D)-(D,D,D)-(D,D,D)-...-(D,D,D)-(D,D)          D
