@@ -23,6 +23,7 @@ def rd_engine(*x,**kargs):
     x/=  torch.norm(x).sqrt()
     x =  torch.autograd.Variable(x,requires_grad=True)
     return x
+rd_engine = None
 def cuda_reset():
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
@@ -49,7 +50,7 @@ contractor_pool={"torch":torch.einsum,'oe':oe.contract}
 def submatrix_test_full_contraction_einsum(D=5,L=5,W=None,B=1,H=None,
                                             backward=True,
                                             path_recorder=None,
-                                            contractor='torch'):
+                                            contractor='torch',rd_engine=rd_engine):
     contract_engine = contractor_pool[contractor]
 
     W = L if W is None else W
@@ -71,14 +72,15 @@ def submatrix_test_full_contraction_einsum(D=5,L=5,W=None,B=1,H=None,
     out      = contract_engine(*operands,optimize=path).flatten(-H-H,-H-1).flatten(-H,-1)
     if backward:
         loss= out.norm()
-        loss.backward()
+        if loss.requires_grad:
+            loss.backward()
     return out,f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"
 
 def submatrix_test_sequence_contraction_einsum(D=5,L=5,B=1,
                                                 backward=True,
                                                 path_recorder=None,
                                                 contractor='torch',
-                                                recurrent = False):
+                                                recurrent = False,rd_engine=rd_engine):
     contract_engine = contractor_pool[contractor]
     L = L-1
     if recurrent and L>2:
@@ -105,7 +107,8 @@ def submatrix_test_sequence_contraction_einsum(D=5,L=5,B=1,
     out        = contract_engine(equation,*tensor_l, optimize=path_final).flatten(-4,-3).flatten(-2,-1)
     if backward:
         loss= out.norm()
-        loss.backward()
+        if loss.requires_grad:
+            loss.backward()
     return out,f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"
 
 def submatrix_test_recurrent_contraction_einsum(**kargs):
@@ -138,7 +141,7 @@ def fullmatrix_test_with_tn(D=5,L=5):
     loss.backward()
     del node_list
     return out,f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"
-def fullmatrix_test_directly(D=5,L=5,B=2,path_recorder=None,contractor='torch'):
+def fullmatrix_test_directly(D=5,L=5,B=2,path_recorder=None,contractor='torch',rd_engine=rd_engine):
     contract_engine = contractor_pool[contractor]
     top_shape_list  =   [(D,D)]  + [  (D,D,D) for i in range(L-2)] + [  (D,D)]
     mid_shape_list  =[  [(D,D,D)]+ [(D,D,D,D) for i in range(L-2)] + [(D,D,D)] for _ in range(L-2)]
@@ -154,11 +157,12 @@ def fullmatrix_test_directly(D=5,L=5,B=2,path_recorder=None,contractor='torch'):
     operands    = structure_operands(tensor_list,sublist_list,outlist,type=contractor)
     out         = contract_engine(*operands,optimize=path)
     loss = out.norm()
-    loss.backward()
+    if loss.requires_grad:
+        loss.backward()
     return out,f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"
-def fullmatrix_test_corn_4(D=5,L=6,B=2,path_recorder=None,contractor='torch'):
+def fullmatrix_test_corn_4(D=5,L=6,B=2,path_recorder=None,contractor='torch',rd_engine=rd_engine):
     contract_engine = contractor_pool[contractor]
-    corn,_ = submatrix_test_full_contraction_einsum(D=D,W=L//2+L%2,H=L//2,B=4*B,backward=False)
+    corn,_ = submatrix_test_full_contraction_einsum(D=D,W=L//2+L%2,H=L//2,B=4*B,backward=False,rd_engine=rd_engine)
     size   = corn.shape[1:]
     corn   = corn.reshape(B,4,*size)
     if L%2 == 0:
@@ -171,9 +175,10 @@ def fullmatrix_test_corn_4(D=5,L=6,B=2,path_recorder=None,contractor='torch'):
         path_final = get_best_path_via_oe(equation,tensor_l,store=path_recorder)
         out        = contract_engine(equation,*tensor_l, optimize=path_final)
     loss   = out.norm()
-    loss.backward()
+    if loss.requires_grad:
+        loss.backward()
     return corn,f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"
-def fullmatrix_test_RG(D=3,B=2,L=7,path_recorder=None,contractor='torch'):
+def fullmatrix_test_RG(D=3,B=2,L=7,path_recorder=None,contractor='torch',rd_engine=rd_engine):
     contract_engine = contractor_pool[contractor]
     def get_index(list1,list2):
         x,y=np.meshgrid(list1,list2)
@@ -192,13 +197,13 @@ def fullmatrix_test_RG(D=3,B=2,L=7,path_recorder=None,contractor='torch'):
         if W%2 ==1:
             last_line_dw = tensor_list.pop()
             last_line_up = tensor_list.pop()
-            tensor_list.append([oe.contract("xabcd,xkjal->xkbjcdl",up,dw).flatten(-5,-4).flatten(-2,-1)
+            tensor_list.append([contract_engine("xabcd,xkjal->xkbjcdl",up,dw).flatten(-5,-4).flatten(-2,-1)
                     for up,dw in zip(last_line_up,last_line_dw)])
         if H%2 ==1:
             tensor_list  = list(map(list,zip(*tensor_list)))
             last_line_dw = tensor_list.pop()
             last_line_up = tensor_list.pop()
-            tensor_list.append([oe.contract("xabcd,xefgb->xaefcgd",up,dw).flatten(-6,-5).flatten(-3,-2)
+            tensor_list.append([contract_engine("xabcd,xefgb->xaefcgd",up,dw).flatten(-6,-5).flatten(-3,-2)
                     for up,dw in zip(last_line_up,last_line_dw)])
             tensor_list  = list(map(list,zip(*tensor_list)))
         W = len(tensor_list)
@@ -225,14 +230,16 @@ def fullmatrix_test_RG(D=3,B=2,L=7,path_recorder=None,contractor='torch'):
             out  = contract_engine(equation,*tensor_l, optimize=path)
             out  = out.flatten(3,4).flatten(-4,-3).flatten(1,2).flatten(-2,-1)
             tensor_list.append(out)
+        #print(f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M")
         #print([t.shape for t in tensor_list])
         n = W//2
         tensor_list = [tensor_list[i:i + n] for i in range(0, len(tensor_list), n)]
     out = tensor_list[0][0].squeeze()
     loss = out.norm()
-    loss.backward()
+    if loss.requires_grad:
+        loss.backward()
     return out,f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"
-def fullmatrix_test_boundary(D=3,L=7,B=2,W=None,H=None,path_recorder=None):
+def fullmatrix_test_boundary(D=3,L=7,B=2,W=None,H=None,path_recorder=None,rd_engine=rd_engine):
     # matrix production only, no optimized path
     W = L if W is None else W
     H = L if H is None else H
@@ -272,7 +279,8 @@ def fullmatrix_test_boundary(D=3,L=7,B=2,W=None,H=None,path_recorder=None):
     out = torch.einsum("xa,xa->x",out,tensor[-1])
     out  = out.squeeze()
     loss = out.norm()
-    loss.backward()
+    if loss.requires_grad:
+        loss.backward()
     return out,f"{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"
 
 def fullmatrix_test_directly_oe(**kargs):
