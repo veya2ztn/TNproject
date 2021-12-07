@@ -16,7 +16,7 @@ from mltool import optim as optim
 
 from torchvision import datasets, transforms
 
-from models.model import NanValueError
+from models import NanValueError
 import models as mdl
 
 MEMORYLIMIT = 0.9
@@ -37,6 +37,8 @@ def custom_2d_patch(x,divide=4):
 #torch.autograd.set_detect_anomaly(True)
 def struct_model(project_config,dataset_train,cuda=True):
     MODEL_TYPE       = project_config.model.backbone_TYPE
+    MODEL_CONIFG     = project_config.model.backbone_config
+
     W,H,P            = dataset_train[0][0].shape[-3:]
     model            = eval(f"mdl.{MODEL_TYPE}")(W=W,H=H,in_physics_bond=P,**MODEL_CONIFG)
     model            = model.cuda() if cuda else model
@@ -56,9 +58,9 @@ def struct_dataloader(project_config,only_valid=False,verbose = True):
     DATASETargs = project_config.data.dataset_args
     transform   = [transforms.ToTensor()]
     if hasattr(project_config.data,'crop') and project_config.data.crop is not None:
-        transforms.append(transforms.CenterCrop(project_config.data.crop))
+        transform.append(transforms.CenterCrop(project_config.data.crop))
     if hasattr(project_config.data,'divide') and project_config.data.divide is not None:
-        transforms.append(lambda x:custom_2d_patch(x,project_config.data.divide))
+        transform.append(lambda x:custom_2d_patch(x,project_config.data.divide))
     transform   = transforms.Compose(transform)
     if only_valid:
         assert DATANORMER == "none"
@@ -99,13 +101,8 @@ def struct_config(project_config,db = None,build_model=True,verbose=True):
     project_config.train.BATCH_SIZE = BATCH_SIZE
 
     #train_loader = DataLoaderX(dataset=db.dataset_train,num_workers=1,batch_size=BATCH_SIZE,pin_memory=True,shuffle=True,collate_fn=db.dataset_train._collate)
-    if db.dataset_train._collate_fn is not None:# for higher version torch,  collate_fn can ==None. Not work for lower version
-        train_loader = DataLoader(dataset=db.dataset_train,num_workers=1,batch_size=BATCH_SIZE,
-                                  pin_memory=True,shuffle=True,collate_fn=db.dataset_train._collate_fn)
-        valid_loader = DataLoader(dataset=db.dataset_valid,batch_size=1000,collate_fn=db.dataset_valid._collate_fn)
-    else:
-        train_loader = DataLoader(dataset=db.dataset_train,num_workers=1,batch_size=BATCH_SIZE,pin_memory=True,shuffle=True)
-        valid_loader = DataLoader(dataset=db.dataset_valid,batch_size=1000)
+    train_loader = DataLoader(dataset=db.dataset_train,batch_size=BATCH_SIZE,pin_memory=True,shuffle=True)
+    valid_loader = DataLoader(dataset=db.dataset_valid,batch_size=BATCH_SIZE)
     project = Project()
 
     project.trials_num   = TRIALS
@@ -135,23 +132,23 @@ def train_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,
     while inter_b.update_step():
         image,label= prefetcher.next()
         model.optimizer.zero_grad()
-        data   = model.preprocess_images(image)
-        logits = model(data)
-        logits = logits.squeeze() if len(logits>1) else logits.squeeze(-1)
-        loss   = torch.nn.CrossEntropyLoss()(logits,label)
+        logit  = model(image.squeeze())
+        logit  = logit.squeeze()
+        loss   = torch.nn.CrossEntropyLoss()(logit,label)
         loss.backward()
         if hasattr(model.optimizer,"grad_clip") and (model.optimizer.grad_clip is not None):
             nn.utils.clip_grad_norm_(model.parameters(), model.optimizer.grad_clip)
         model.optimizer.step()
         if model.scheduler is not None:model.scheduler.step()
-        if test_mode:return
+
         loss = loss.cpu().item()
-        accu = torch.sum(torch.argmax(logits,-1) == labels)/len(labels)
+        accu = (torch.sum(torch.argmax(logit,-1) == label)/len(label)).cpu().item()
         logsys.batch_loss_record([loss,accu])
         train_loss.append(loss)
         train_accu.append(accu)
         outstring="Batch:{:3}/{} loss:{:.4f} accu:{:.3f}".format(inter_b.now,batches,loss,accu)
         inter_b.lwrite(outstring, end="\r")
+        if test_mode:return
     if not detail_log:
         train_loss=np.array(train_loss).mean()
         train_accu=np.array(train_accu).mean()
@@ -167,10 +164,9 @@ def test_epoch(model,dataloader,logsys,accu_list=None,Fethcher=DataSimfetcher,in
     logits = []
     with torch.no_grad():
         while inter_b.update_step():
-            # torch.cuda.empty_cache()
-            data   = model.preprocess_images(image)
-            logit  = model(data)
-            logit  = logit.squeeze() if len(logit>1) else logit.squeeze(-1)
+            image,label= prefetcher.next()
+            logit  = model(image.squeeze())
+            logit  = logit.squeeze()
             labels.append(label)
             logits.append(logit)
     labels  = torch.cat(labels)
@@ -245,11 +241,7 @@ def do_train(model,project,train_loader,valid_loader,logsys,trial=False):
 def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=False):
 
     logsys.regist({'task':project.project_name,'model':project.full_config.model.backbone_TYPE})
-    criterion = project.full_config.model.criterion_type
-    if criterion in ["BCELossLogits","CELoss","FocalLoss1","BCELoss"]:
-        #print(f" ====== use {criterion} ======== ")
-        train_loader.dataset.use_classifier_loss(criterion)
-        valid_loader.dataset.use_classifier_loss(criterion)
+    logsys.Q_batch_loss_record=True
     train_mode      = project.train_mode
     args            = project.full_config
     if hasattr(args,'comment') and args.comment != "":
@@ -271,8 +263,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     optimizer           = eval(f"optim.{optimizer_TYPE}")(model.parameters(), **optimizer_config)
     optimizer.grad_clip = args.train.grad_clip
 
-    criterion_config    = args.model.criterion_config if hasattr(args.model,'criterion_config') else {}
-    criterion           = train_loader.dataset.criterion(args.model.criterion_type)(**criterion_config)
+    criterion           = torch.nn.CrossEntropyLoss()
 
     scheduler_config    = args.train.scheduler.config
     scheduler_TYPE      = args.train.scheduler._TYPE_

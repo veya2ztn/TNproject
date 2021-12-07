@@ -2,7 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import opt_einsum as oe
+from inspect import signature
 class TN_Base(nn.Module):
+    def __init__(self,einsum_engine=torch.einsum):
+        super().__init__()
+        if einsum_engine == torch.einsum and 'optimize' in signature(torch.einsum).parameters:
+            self.einsum = torch.einsum
+        else:
+            self.einsum = oe.contract
     @staticmethod
     def rde1(shape,init_std):
         if len(shape) == 2:
@@ -13,6 +20,7 @@ class TN_Base(nn.Module):
             a,b,c        = shape[-3:]
             bias_mat     = torch.eye(a, c).unsqueeze(1).repeat(1,b,1)
             tensor       = init_std * torch.randn(*shape)+ bias_mat
+        tensor/=tensor.norm()
         return tensor
 
     @staticmethod
@@ -25,6 +33,7 @@ class TN_Base(nn.Module):
         for i in range(offset):bias_mat=bias_mat.unsqueeze(0)
         bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
         tensor     = init_std * torch.randn(*shape)+ bias_mat
+        tensor/=tensor.norm()
         return tensor
     @staticmethod
     def rde2D(shape,init_std,offset=2):
@@ -41,6 +50,7 @@ class TN_Base(nn.Module):
 
         bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
         tensor     = init_std * torch.randn(*shape)+ bias_mat
+        tensor/=tensor.norm()
         return tensor
 
     @staticmethod
@@ -111,8 +121,18 @@ class TN_Base(nn.Module):
         cent_input = batch_image_input[...,-1,-1,:]
         return bulk_input,edge_input,corn_input,cent_input
 
-    def auto_opt_einsum(self,path_id,equation,*batch_input):
+    def einsum_engine(self,*operands,optimize=None):
+        #path_id,equation,*batch_input):
         if not hasattr(self,'path_record'):self.path_record={}
-        if path_id not in self.path_record:
-            self.path_record[path_id] = oe.contract_path(equation, *batch_input)[0]
-        return torch.einsum(equation,*batch_input, optimize=self.path_record[path_id])
+        if isinstance(operands[0],str):
+            equation = operands[0]
+            tensor_l = operands[1:]
+            array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
+            if array_string not in self.path_record:
+                self.path_record[array_string] = oe.contract_path(equation, *tensor_l,optimize='random-greedy')[0]
+            return self.einsum(equation,*tensor_l, optimize=self.path_record[array_string])
+        else:
+            assert optimize is not None
+            # for now, we will compute path at outside since we need build the contraction map
+            # in __init__ phase. So build map at that time make sense
+            return self.einsum(*operands,optimize=optimize)

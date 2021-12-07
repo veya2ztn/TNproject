@@ -165,7 +165,7 @@ def parse_model(config):
     if hasattr(config,'backbone_alias') and config.backbone_alias  is not None:
         real_name = config.backbone_alias
     elif hasattr(config,'backbone_config') and config.backbone_config is not None:
-        real_name = eval(config.backbone_TYPE).model_name(**config.backbone_config)
+        real_name = config.backbone_TYPE
     #name += ".cr,{}".format(config.criterion_type) if config.criterion_type!="default" else ""
     return real_name,name,config
 
@@ -181,16 +181,9 @@ def parse_data_dict(user_dic):
             user_dic['dataset_args']['range_clip'] = user_dic['range_clip']
             del user_dic['range_clip']
 
-        dataset_flag = eval(dataset_name).get_dataset_name(**user_dic['dataset_args'])
+        dataset_flag = dataset_name
         name += "SMSDataset{},{},{}".format(dataset_flag,type_predicted,target_predicted)
 
-    else:
-        #if 'transform_TYPE'  in user_dic:
-        transformer_setting = user_dic['transform_config']
-        transformer = eval(user_dic['transform_TYPE'])(**transformer_setting)
-        feature_num = transformer.output_dim(user_dic['feature_num'])
-        name="({}).{}".format(feature_num,transformer.name)
-        user_dic['dataset_args']={'vec_dim':feature_num}
     real_name = name
     if 'dataset_norm' not in user_dic:user_dic['dataset_norm']='none'
 
@@ -255,21 +248,11 @@ def read_model(user_dic):
         if 'backbone_alias' in user_dic and user_dic['backbone_alias'] is not None:
             user_dic['str_backbone_TYPE'] = user_dic['backbone_alias']
         else:
-            user_dic['str_backbone_TYPE']=eval(user_dic["backbone_TYPE"]).model_name(**user_dic["backbone_config"])
+            user_dic['str_backbone_TYPE']=user_dic["backbone_TYPE"]
     else:
         if 'backbone_TYPE'  in user_dic:
             user_dic['str_backbone_TYPE']=user_dic['backbone_TYPE']
     #for key,val in new_pool.items():user_dic[key]=val
     return Config(user_dic)
 def read_data(user_dic):
-    for key,val in user_dic.items():
-        if 'data_curve' in key or 'data_image' in key:
-            if isinstance(val,list):
-                user_dic[key]=[(os.path.join(DATAROOT,v.rstrip('/')) if DATAROOT not in v else v.rstrip('/')) for v in val ]
-            else:
-                if val is not None:
-                    user_dic[key]=os.path.join(DATAROOT,val.rstrip('/')) if DATAROOT not in val else val.rstrip('/')
-                else:
-                    user_dic[key] = None
-
     return Config(user_dic)
