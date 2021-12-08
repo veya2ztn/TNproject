@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import opt_einsum as oe
 from inspect import signature
+import numpy as np
 class TN_Base(nn.Module):
     def __init__(self,einsum_engine=torch.einsum):
         super().__init__()
@@ -20,23 +21,11 @@ class TN_Base(nn.Module):
             a,b,c        = shape[-3:]
             bias_mat     = torch.eye(a, c).unsqueeze(1).repeat(1,b,1)
             tensor       = init_std * torch.randn(*shape)+ bias_mat
-        tensor/=tensor.norm()
+        #tensor/=tensor.norm()
         return tensor
 
     @staticmethod
-    def rde2D2(shape,init_std,offset=2):
-        size_shape = shape[:offset]
-        bias_shape = shape[offset:]
-        bias_mat   = torch.zeros(bias_shape)
-        diag_idx   = [list(range(min(bias_shape)))]*len(bias_shape)
-        bias_mat[diag_idx] = 1
-        for i in range(offset):bias_mat=bias_mat.unsqueeze(0)
-        bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
-        tensor     = init_std * torch.randn(*shape)+ bias_mat
-        tensor/=tensor.norm()
-        return tensor
-    @staticmethod
-    def rde2D(shape,init_std,offset=2):
+    def rde2D3(shape,init_std,offset=2):
         size_shape = shape[:offset]
         bias_shape = shape[offset:]
         if len(bias_shape) ==2 :
@@ -47,12 +36,34 @@ class TN_Base(nn.Module):
         elif len(bias_shape) == 4:
             a,b,c,d   = bias_shape
             bias_mat   = torch.kron(torch.ones(a,b),torch.eye(c,d)).reshape(a,b,c,d)
-
+        bias_mat  /= bias_mat.norm()
         bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
         tensor     = init_std * torch.randn(*shape)+ bias_mat
-        tensor/=tensor.norm()
+        #tensor/=tensor.norm()
         return tensor
 
+    @staticmethod
+    def rde2D(shape,init_std,offset=2,physics_index=None):
+        size_shape = shape[:offset]
+        bias_shape = shape[offset:]
+        max_dim    = max(bias_shape)
+        full_rank  = len(bias_shape)
+        half_rank  = full_rank//2
+        rest_rank  = full_rank-half_rank
+        bias_mat   = torch.eye(max_dim**half_rank,max_dim**rest_rank)
+        bias_mat   = bias_mat.reshape(*([max_dim]*full_rank))
+        for i,d in enumerate(bias_shape):
+            bias_mat   = torch.index_select(bias_mat, i,torch.arange(d))
+        norm       = np.sqrt(np.prod(bias_shape))
+        if physics_index is not None:
+            norm  *= np.sqrt(size_shape[physics_index])
+        #print(norm)
+        bias_mat  /= norm
+        bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
+        tensor     = init_std * torch.randn(*shape)+ bias_mat
+        #tensor    /= tensor.norm()
+        return tensor
+        
     @staticmethod
     def batch_together(inputs,svd_kargs=None):
         inputs= inputs.permute(1,2,0)#(B,num,k)->(num,k,B)

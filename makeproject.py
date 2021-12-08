@@ -26,7 +26,7 @@ hypertuner= [Normal_Train_Default]
                                                         # })]
 
 schedulers= [Scheduler_None]
-optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
+optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
 earlystops= [Earlystop_NMM_Default.copy({"_TYPE_":"no_min_more","config":{"es_max_window":40}})]
 anormal_detect= [Anormal_D_DC_Default.copy({"_TYPE_":"decrease_counting",
                                       "config":{"stop_counting":30,
@@ -40,10 +40,8 @@ train_config_list = [ConfigCombine({"base":[b,h], "scheduler":[s], "earlystop":[
 
 
 dataset_config_list=[Config({'dataset_TYPE':'datasets.MNIST',
-                             'dataset_args':{'root':DATAROOT+f"/MNIST"},
-                             'crop':24,
-                             'divide':4})]
-model_config_list = [backbone_templete.copy({'backbone_TYPE':'LinearCombineModel1',
+                             'dataset_args':{'root':DATAROOT+f"/MNIST"}})]
+model_config_list = [backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
                                              'backbone_config':{'virtual_bond_dim':5,'init_std':1},
 
                                              }

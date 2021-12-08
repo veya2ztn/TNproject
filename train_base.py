@@ -32,15 +32,15 @@ def custom_2d_patch(x,divide=4):
     assert dim1%divide==0
     x     = x.reshape((B, dim0//divide,divide,dim1//divide,divide)).permute(0,1,3,2,4)
     x     = x.flatten(start_dim=-2,end_dim=-1)
-    return 1-x
+    return (1-x)
 
 #torch.autograd.set_detect_anomaly(True)
 def struct_model(project_config,dataset_train,cuda=True):
     MODEL_TYPE       = project_config.model.backbone_TYPE
     MODEL_CONIFG     = project_config.model.backbone_config
 
-    W,H,P            = dataset_train[0][0].shape[-3:]
-    model            = eval(f"mdl.{MODEL_TYPE}")(W=W,H=H,in_physics_bond=P,**MODEL_CONIFG)
+    #W,H,P            = dataset_train[0][0].shape[-3:]
+    model            = eval(f"mdl.{MODEL_TYPE}")(**MODEL_CONIFG)
     model            = model.cuda() if cuda else model
     if hasattr(project_config.model,'pre_train_weight'):
         pre_train_weight  = project_config.model.pre_train_weight
@@ -132,7 +132,7 @@ def train_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,
     while inter_b.update_step():
         image,label= prefetcher.next()
         model.optimizer.zero_grad()
-        logit  = model(image.squeeze())
+        logit  = model(image)
         logit  = logit.squeeze()
         loss   = torch.nn.CrossEntropyLoss()(logit,label)
         loss.backward()
@@ -165,7 +165,7 @@ def test_epoch(model,dataloader,logsys,accu_list=None,Fethcher=DataSimfetcher,in
     with torch.no_grad():
         while inter_b.update_step():
             image,label= prefetcher.next()
-            logit  = model(image.squeeze())
+            logit  = model(image)
             logit  = logit.squeeze()
             labels.append(label)
             logits.append(logit)

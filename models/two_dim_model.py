@@ -22,10 +22,10 @@ class PEPS_einsum_uniform_shape(TN_Base):
         self.label_pos_x   = label_pos_x
         self.label_pos_y   = label_pos_y
         self.path_record  = {}
-        self.bulk_tensors = nn.Parameter(self.rde2D((     (W-2)*(H-2),P,D,D,D,D),init_std))
-        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std))
-        self.corn_tensors = nn.Parameter(self.rde2D(                 (3,P,D,D),init_std))
-        self.cent_tensors = nn.Parameter(self.rde2D(                 (O,P,D,D),init_std))
+        self.bulk_tensors = nn.Parameter(self.rde2D((     (W-2)*(H-2),P,D,D,D,D),init_std, offset=2))
+        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std, offset=2))
+        self.corn_tensors = nn.Parameter(self.rde2D(                 (3,P,D,D),init_std, offset=2))
+        self.cent_tensors = nn.Parameter(self.rde2D(                 (O,P,D,D),init_std, offset=2))
     def mpo_line(self,i,bulk_tensors,edge_tensors,corn_tensors,cent_tensors):
         W=self.W
         H=self.H
@@ -379,10 +379,10 @@ class PEPS_einsum_uniform_shape_6x6_all_together(TN_Base):
         self.outlist      = outlist
         self.path         = path
 
-        self.bulk_tensors = nn.Parameter(self.rde2D((     (W-2)*(H-2),P,D,D,D,D),init_std))
-        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std))
-        self.corn_tensors = nn.Parameter(self.rde2D(                 (3,P,D,D),init_std))
-        self.cent_tensors = nn.Parameter(self.rde2D(                 (O,P,D,D),init_std))
+        self.bulk_tensors = nn.Parameter(self.rde2D((     (W-2)*(H-2),P,D,D,D,D),init_std, offset=2))
+        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std, offset=2))
+        self.corn_tensors = nn.Parameter(self.rde2D(                 (3,P,D,D),init_std, offset=2))
+        self.cent_tensors = nn.Parameter(self.rde2D(                 (O,P,D,D),init_std, offset=2))
 
     def forward(self,input_data):
         bulk_input,edge_input,corn_input,cent_input = PEPS_einsum_uniform_shape.flatten_image_input(input_data)
@@ -417,12 +417,12 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
         O                  = np.power(16,1/4)
         assert np.ceil(O) == np.floor(O)
         self.O             = O = O.astype('uint')
-        self.vbd           = D = virtual_bond_dim
-        self.ipb           = P = in_physics_bond
+        self.D             = D = virtual_bond_dim
+        self.P             = P = in_physics_bond
 
-        self.corn_tensors = nn.Parameter(self.rde2D( (4,O,P,D,D),init_std))
-        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std))
-        self.bulk_tensors = nn.Parameter(self.rde2D( ((W-2)*(H-2),P,D,D,D,D),init_std))
+        self.corn_tensors = nn.Parameter(self.rde2D( (4,O,P,D,D),init_std, offset=3))
+        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std, offset=2))
+        self.bulk_tensors = nn.Parameter(self.rde2D( ((W-2)*(H-2),P,D,D,D,D),init_std, offset=2))
 class PEPS_uniform_shape_symmetry_any(PEPS_uniform_shape_symmetry_base):
     def __init__(self, **kargs):
         super().__init__(**kargs)
@@ -430,11 +430,13 @@ class PEPS_uniform_shape_symmetry_any(PEPS_uniform_shape_symmetry_base):
         H = self.H
         O = self.O
         P = self.P
+        D = self.D
         self.LW = LW = W//2
         self.LH = LH = H//2
         tn2D_shape_list                = [ [(D,D,O)]+[  (D,D,D)]*(LH-1) ]+ \
                                          [ [(D,D,D)]+[(D,D,D,D)]*(LH-1)]*(LW-1)
         node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
+
         path,info                      = get_optim_path_by_oe_from_tn(node_list)
         last_idx = outlist.pop()
         outlist.insert(LH,last_idx)
@@ -469,10 +471,12 @@ class PEPS_uniform_shape_symmetry_any(PEPS_uniform_shape_symmetry_base):
         assert len(tensor_list)==len(self.sublist_list)
         operands=[]
         for tensor,sublist in zip(tensor_list,self.sublist_list):
-            operand = [tensor,[...,*self.sublist_list]]
+            operand = [tensor,[...,*sublist]]
             operands+=operand
-        operands+= [[...,*self.outlist]]
+        operands+= [[...,*(self.outlist)]]
+
         # in this case W==H , LW==LH
+
         quater_contraction = self.einsum_engine(*operands,optimize=self.path).flatten(-2*LW,-LW-1).flatten(-LW,-1)
 
         tensor  = self.einsum_engine("lkmab,lknbc->lkmnac",
@@ -507,7 +511,7 @@ class PEPS_uniform_shape_symmetry_6x6(PEPS_uniform_shape_symmetry_base):
                 edge_tensors[[ 6, 2,13, 9]],
                 bulk_tensors[[ 4, 2,13,11]],
                 bulk_tensors[[ 5, 6, 9,10]]
-                ).flatten(-6,-4).flatten(-3,-1)
+            ).flatten(-6,-4).flatten(-3,-1)
         tensor  = self.einsum_engine("lkmab,lknbc->lkmnac",
                               quater_contraction[[0,2]],quater_contraction[[1,3]]
                               ).flatten(-4,-3)# -> (2,B,O^2,D^3,D^3)
