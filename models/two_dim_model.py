@@ -575,16 +575,92 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         input_data  = input_data.flatten(1,2)
         batch_input = []
         for _input,unit in zip(input_data.permute(1,0,2),self.unit_list):
-            if len(unit.shape)==3:
-                batch_unit = self.einsum_engine("kp,pab->kab",_input,unit)
-            elif len(unit.shape)==4:
-                batch_unit = self.einsum_engine("kp,pabc->kabc",_input,unit)
-            elif len(unit.shape)==5:
-                batch_unit = self.einsum_engine("kp,pabcd->kabcd",_input,unit)
+            batch_unit = torch.tensordot(_input,unit,dims=([-1], [0]))
             batch_input.append(batch_unit)
 
         operands=[]
         for tensor,sublist in zip(batch_input,self.sublist_list):
+            operand = [tensor,[...,*sublist]]
+            operands+=operand
+        operands+= [[...,*self.outlist]]
+        return self.einsum_engine(*operands,optimize=self.path)
+
+class PEPS_einsum_arbitrary_partition_optim(TN_Base):
+    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_dim="models/arbitary_shape/arbitary_shape_1.json",
+                       bias=True,label_position='center',init_std=1e-10,contraction_mode = 'recursion'):
+        super().__init__()
+        if isinstance(virtual_bond_dim,str):
+            arbitary_shape_state_dict = torch.load(virtual_bond_dim)
+        else:
+            arbitary_shape_state_dict = virtual_bond_dim
+        assert isinstance(arbitary_shape_state_dict,dict)
+        info_per_group = arbitary_shape_state_dict['node']
+        info_per_line  = arbitary_shape_state_dict['line']
+        info_per_point = arbitary_shape_state_dict['element']
+
+        center_group       = 0
+        damgling_num       = len(info_per_group)
+        info_per_group[center_group]['neighbor'].append(damgling_num)
+        info_per_line[(center_group,damgling_num)]={'D': out_features}
+
+        self.info_per_group=info_per_group
+        self.info_per_line =info_per_line
+        self.info_per_point=info_per_point
+
+        operands = []
+        sublist_list=[]
+        outlist  = [list(info_per_line.keys()).index((center_group,damgling_num))]
+        ranks_list=[]
+        for group_now in range(len(info_per_group)):
+            group_info= info_per_group[group_now]
+            neighbors = group_info['neighbor']
+            ranks = []
+            sublist=[]
+            for neighbor_id in neighbors:
+                line_tuple = [group_now,neighbor_id]
+                line_tuple.sort()
+                line_tuple= tuple(line_tuple)
+                D = int(info_per_line[line_tuple]['D'])
+                idx = list(info_per_line.keys()).index(line_tuple)
+                ranks.append(D)
+                sublist.append(idx)
+            tensor = np.random.randn(*ranks)
+            operands+=[tensor,[*sublist]]
+
+            ranks_list.append(ranks)
+            sublist_list.append(sublist)
+        operands+= [[...,*outlist]]
+        path,info = oe.contract_path(*operands,optimize='random-greedy-128')
+
+        self.path         = path
+        self.sublist_list = sublist_list
+        self.outlist      = outlist
+
+        unit_list = []
+        for i in range(len(sublist_list)):
+            shape = ranks_list[i]
+            P     = len(info_per_group[i]['element'])
+            unit_list.append(self.rde2D((P,*shape),init_std,offset= 2 if i==center_group else 1))
+        assert len(unit_list)==len(sublist_list)
+
+        self.unit_list = [nn.Parameter(v) for v in unit_list]
+        for i, v in enumerate(self.unit_list):
+            self.register_parameter(f'unit_{i}', param=v)
+
+    def forward(self,input_data):
+        #input data shape B,1,W,H
+        assert len(input_data.shape)==4
+        input_data  = input_data.flatten(-3,-1)
+
+        _input = []
+        for i,unit in enumerate(self.unit_list):
+            patch_idx  = self.info_per_group[i]['element_idx']
+            batch_input= input_data[...,patch_idx] # B,P
+            batch_unit = torch.tensordot(batch_input,unit,dims=([-1], [0]))
+            _input.append(batch_unit)
+
+        operands=[]
+        for tensor,sublist in zip(_input,self.sublist_list):
             operand = [tensor,[...,*sublist]]
             operands+=operand
         operands+= [[...,*self.outlist]]
