@@ -29,21 +29,6 @@ def cuda_reset():
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.reset_accumulated_memory_stats()
     #print(f"empty:{torch.cuda.memory_stats()['reserved_bytes.all.peak']/1024/1024}M"),
-def structure_operands(tensor_list,sublist_list,outlist,type='torch'):
-    type='torch'
-    if type == "torch":
-        operands=[]
-        for tensor,sublist in zip(tensor_list,sublist_list):
-            operand = [tensor,[...,*sublist]]
-            operands+=operand
-        operands+= [[...,*outlist]]
-    elif type == "oe":
-        operands=[]
-        for tensor,sublist in zip(tensor_list,sublist_list):
-            operand = [tensor,[*sublist]]
-            operands+=operand
-        operands+= [[*outlist]]
-    return operands
 
 contractor_pool={"torch":torch.einsum,'oe':oe.contract}
 

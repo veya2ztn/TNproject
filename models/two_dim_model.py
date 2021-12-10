@@ -2,8 +2,8 @@ from .tensornetwork_base import *
 from .model_utils import *
 import opt_einsum as oe
 import numpy as np
-contractor_pool={"torch":torch.einsum,'oe':oe.contract}
 
+path_recorder  = "models/arbitrary_shape_path_recorder.json"
 class PEPS_einsum_uniform_shape(TN_Base):
     def __init__(self, W,H,out_features,
                        in_physics_bond = 2, virtual_bond_dim=2,
@@ -406,7 +406,7 @@ class PEPS_einsum_uniform_shape_6x6_all_together(TN_Base):
 
 
 class PEPS_uniform_shape_symmetry_base(TN_Base):
-    def __init__(self, W=6,H=6,out_features=10,
+    def __init__(self, W=6,H=6,out_features=16,
                        in_physics_bond = 2, virtual_bond_dim=2,
                        init_std=1e-10):
         super().__init__()
@@ -414,7 +414,7 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
         self.W             = W
         self.H             = H
         self.out_features  = out_features
-        O                  = np.power(16,1/4)
+        O                  = np.power(out_features,1/4)
         assert np.ceil(O) == np.floor(O)
         self.O             = O = O.astype('uint')
         self.D             = D = virtual_bond_dim
@@ -520,6 +520,79 @@ class PEPS_uniform_shape_symmetry_6x6(PEPS_uniform_shape_symmetry_base):
                               ).flatten(-2,-1)# -> (B,O^4)
         return tensor
 
+class PEPS_uniform_shape_symmetry_deep_model(TN_Base):
+    def __init__(self, W=6,H=6,out_features=16,
+                       in_physics_bond = 2, virtual_bond_dim=2,nonlinear_layer=nn.Tanh(),
+                       normlized_layer_module=nn.InstanceNorm3d,
+                       init_std=1e-10):
+        super().__init__()
+        assert (W % 2 == 0) and (H % 2 == 0) and (W == H)
+        self.W             = W
+        self.H             = H
+        self.out_features  = out_features
+        O                  = np.power(out_features,1/4)
+        assert np.ceil(O) == np.floor(O)
+        self.O             = O = O.astype('uint')
+        assert isinstance(virtual_bond_dim,int)
+        self.D             = D = virtual_bond_dim
+        self.P             = P = in_physics_bond
+
+        self.LW = LW = W//2
+        self.LH = LH = H//2
+
+        tn2D_shape_list= [ [(4,O,D,D)]+[  (4,D,D,D)]*(LH-1) ]+ \
+                         [ [(4,D,D,D)]+[(4,D,D,D,D)]*(LH-1)]*(LW-1)
+        tn2D_shape_list= [l for t in tn2D_shape_list for l in t]
+        unit_list      = [self.rde2D((P,*l),init_std,offset=3 if i==0 else 2) for i,l in enumerate(tn2D_shape_list)]
+        self.unit_list = [nn.Parameter(v) for v in unit_list]
+        for i, v in enumerate(self.unit_list):
+            self.register_parameter(f'unit_{i//LW}-{i%LW}', param=v)
+
+        self.edge_contraction_path = []
+        self.edge_r_idx_per_round  = []
+        self.edge_d_idx_per_round  = []
+        self.cent_idx_per_round    = []
+        self.normlized_layers      = nn.ModuleList([normlized_layer_module(4) for _ in range(LW)])
+
+        self.first_corn_idx = np.ravel_multi_index([[0,0,1,1],[0,1,1,0]],(LW,LW)).tolist()
+        for L in range(2,LW):
+            tn2D_shape_list = [[(D,D,D)]+[(D,D,D,D)]*(L-1)]
+            path,sublist_list,outlist = get_best_path(tn2D_shape_list,store=path_recorder,type='sub')
+            self.edge_contraction_path.append([path,sublist_list,outlist])
+
+            point = np.array([(j,L) for j in range(L)]).transpose()
+
+            self.edge_r_idx_per_round.append(np.ravel_multi_index(point,(LW,LW)).tolist())
+
+            point = np.array([(L,j) for j in range(L)]).transpose()
+            self.edge_d_idx_per_round.append(np.ravel_multi_index(point,(LW,LW)).tolist())
+
+            self.cent_idx_per_round.append(np.ravel_multi_index([L,L],(LW,LW)).tolist())
+        self.nonlinear_layer = nonlinear_layer
+    def forward(self,input_data):
+        #input data shape B,W,H,P
+        input_data  = input_data.flatten(1,2).permute(1,0,2)#(L,B,P)
+        batch_unit  = [torch.tensordot(_input,unit,dims=([-1], [0])) for _input,unit in zip(input_data,self.unit_list)]
+        corn_tensors= [batch_unit[idx] for idx in self.first_corn_idx]
+        #print([t.shape for t in corn_tensors])
+        corn  = self.einsum_engine("kloab,klcdb,klefcg,klgha->klohedf",*corn_tensors).flatten(-4,-3).flatten(-2,-1)
+        corn = self.nonlinear_layer(corn)
+        corn = self.normlized_layers[0](corn)
+        for i in range(len(self.cent_idx_per_round)):
+            path,sublist_list,outlist = self.edge_contraction_path[i]
+            edge_tensors= [torch.stack([batch_unit[id1],batch_unit[id2]]) for id1,id2 in zip(self.edge_r_idx_per_round[i],self.edge_d_idx_per_round[i])]
+            L = len(edge_tensors)
+            operands    = structure_operands(edge_tensors,sublist_list,outlist)
+            edge1,edge2 = self.einsum_engine(*operands,optimize=path).flatten(-2*L,-L-1).flatten(-L,-1)
+            cent_tensor = batch_unit[self.cent_idx_per_round[i]]
+            corn = self.einsum_engine("kloab,klcdb,klefcg,klgha->klohedf",corn ,edge1,cent_tensor,edge2).flatten(-4,-3).flatten(-2,-1)
+            corn = self.nonlinear_layer(corn)
+            corn = self.normlized_layers[i+1](corn)
+        # corn now is a tensor (B,4,D^(L/2),D^(L/2))
+        corn   = self.einsum_engine("xkmab,xknbc->xkmnac",corn[:,[0,2]],corn[:,[1,3]]).flatten(-4,-3)
+        corn   = self.einsum_engine("xmab,xnba->xmn",corn[:,0],corn[:,1]).flatten(-2,-1)
+        return corn
+
 
 class PEPS_einsum_arbitrary_shape_optim(TN_Base):
     def __init__(self, W, H ,out_features=10,
@@ -566,9 +639,6 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         self.unit_list = [nn.Parameter(v) for v in unit_list]
         for i, v in enumerate(self.unit_list):
             self.register_parameter(f'unit_{i//W}-{i%W}', param=v)
-
-
-
 
     def forward(self,input_data):
         #input data shape B,W,H,P

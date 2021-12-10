@@ -253,3 +253,18 @@ def batch_contract_mps_mps(mps_list,mpo_list):
 
     new_mps_list.append(tensor)
     return new_mps_list
+def structure_operands(tensor_list,sublist_list,outlist,type='torch'):
+    type='torch'
+    if type == "torch":
+        operands=[]
+        for tensor,sublist in zip(tensor_list,sublist_list):
+            operand = [tensor,[...,*sublist]]
+            operands+=operand
+        operands+= [[...,*outlist]]
+    elif type == "oe":
+        operands=[]
+        for tensor,sublist in zip(tensor_list,sublist_list):
+            operand = [tensor,[*sublist]]
+            operands+=operand
+        operands+= [[*outlist]]
+    return operands
