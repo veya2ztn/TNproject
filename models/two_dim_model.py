@@ -435,9 +435,9 @@ class PEPS_uniform_shape_symmetry_any(PEPS_uniform_shape_symmetry_base):
         self.LH = LH = H//2
         tn2D_shape_list                = [ [(D,D,O)]+[  (D,D,D)]*(LH-1) ]+ \
                                          [ [(D,D,D)]+[(D,D,D,D)]*(LH-1)]*(LW-1)
-        node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
-
-        path,info                      = get_optim_path_by_oe_from_tn(node_list)
+        path,sublist_list,outlist = get_best_path(tn2D_shape_list,store=path_recorder,type='sub')
+        #node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
+        #path,info                      = get_optim_path_by_oe_from_tn(node_list)
         last_idx = outlist.pop()
         outlist.insert(LH,last_idx)
         #print(outlist)

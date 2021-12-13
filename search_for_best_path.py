@@ -11,24 +11,30 @@ json_file ="models/arbitrary_shape_path_recorder.json"
 # with open(json_file,'w') as f:
 #     json.dump(path_pool,f)
 # raise
-D=6;O=10;L=6
-top_shape_list  =   [(D,D)]  + [  (D,D,D) for i in range(L-2)] + [  (D,D)]
-mid_shape_list  =[  [(D,D,D)]+ [(D,D,D,D) for i in range(L-2)] + [(D,D,D)] for _ in range(L-2)]
-bot_shape_list  =   [(D,D)]  + [  (D,D,D) for i in range(L-2)] + [(D,O,D)]
-tn2D_shape_list = [top_shape_list]+mid_shape_list+[bot_shape_list]
-node_list,sublist_list,outlist =  create_templete_2DTN_tn(tn2D_shape_list)
+D=8;O=2;L=W=H=6
+LW = W//2
+LH = H//2
+# top_shape_list  =   [(D,D)]  + [  (D,D,D) for i in range(L-2)] + [  (D,D)]
+# mid_shape_list  =[  [(D,D,D)]+ [(D,D,D,D) for i in range(L-2)] + [(D,D,D)] for _ in range(L-2)]
+# bot_shape_list  =   [(D,D)]  + [  (D,D,D) for i in range(L-2)] + [(D,O,D)]
+# tn2D_shape_list = [top_shape_list]+mid_shape_list+[bot_shape_list]
+# node_list,sublist_list,outlist =  create_templete_2DTN_tn(tn2D_shape_list)
+tn2D_shape_list                = [ [(D,D,O)]+[  (D,D,D)]*(LH-1) ]+ \
+                                 [ [(D,D,D)]+[(D,D,D,D)]*(LH-1)]*(LW-1)
+node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
 operands = []
 for node in node_list:
     operands+=[node.tensor,[edge.name for edge in node.edges]]
 operands+= [[edge.name for edge in get_all_dangling(node_list)]]
 
-optimizer = oe.RandomGreedy(max_time=10, max_repeats=1000)
+optimizer = oe.RandomGreedy(max_time=20, max_repeats=1000)
 for T in [1000,100,10,1,0.1,0.1,0.1]:
     optimizer.temperature = T
     path_rand_greedy = oe.contract_path(*operands, optimize=optimizer)
     print(math.log2(optimizer.best['flops']))
 optimizer.best['path'] = oe.paths.ssa_to_linear(optimizer.best['ssa_path'])
-
+optimizer.best['outlist']=outlist
+optimizer.best['sublist_list']=sublist_list
 if not os.path.exists(json_file):
     path_pool={}
 else:

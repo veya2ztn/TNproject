@@ -22,7 +22,7 @@ parser.add_argument("--movefinished", default=1, type=int,help='delete the finis
 parser.add_argument("--comment", default="", type=str,help='description')
 parser.add_argument("--offset", default=0, type=int,help='offset num for multiTask')
 args = parser.parse_args()
-
+if args.mode != "parallel":os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 PROJECTFILES = args.taskdir
 if len(os.listdir(PROJECTFILES)) == 0 and args.mode == 'default':
     print("=== No project file. abort! ==")
@@ -73,8 +73,9 @@ if  args.mode == "multiTask":
         print('last task is exit error,please cheak')
         raise
 
-if args.mode != "parallel":os.environ["CUDA_VISIBLE_DEVICES"] = job_gpu
 
+# print(job_gpu)
+# raise
 RECARDFILE   = "../LOGFILE/unrecard/"
 db = None
 BACKUP_DIR   = 'projects/back'

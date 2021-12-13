@@ -107,7 +107,7 @@ def struct_config(project_config,db = None,build_model=True,verbose=True):
 
     project.trials_num   = TRIALS
     project.train_epoches= EPOCHES
-    project.project_name = PROJECTNAME+".on{}".format(len(db.dataset_train)) if DATA_VOLUME is None else PROJECTNAME
+    project.project_name = PROJECTNAME
     #project.project_name = PROJECTNAME
     project.train_loader = train_loader
     project.valid_loader = valid_loader
@@ -184,13 +184,10 @@ def get_hparam_dict(config):
                        'optimer':config.train.optimizer.str_optimizer_TYPE if hasattr(config.train.optimizer,"str_optimizer_TYPE") \
                                  else config.train.optimizer._TYPE_,
                        'lr': config.train.optimizer.config['lr'],
-                       'normf':config.data.dataset_norm,
                      }
-    if hasattr(config.train,'volume'):hparam_dict['volume']=config.train.volume
-    if hasattr(config.train,'drop_rate'):hparam_dict['drop_rate']=config.train.drop_rate
-    if hasattr(config.model,'criterion_config'):
-        for key, val in config.model.criterion_config.items():
-            hparam_dict[f'criterion_config_{key}']=val
+    if hasattr(config.model,'backbone_config'):
+        for key, val in config.model.backbone_config.items():
+            hparam_dict[f'model_{key}']=val
     if hasattr(config,"optuna_hparam"):
         for key,val in config.optuna_hparam.items():
             hparam_dict[key]=val
@@ -596,7 +593,7 @@ def train_for_one_task(model,project):
         optuna_limit_trials = project.full_config.train.optuna_limit_trials if hasattr(project.full_config.train,"optuna_limit_trials") else 30
         if len([t.state for t in study.trials if t.state== TrialState.COMPLETE])>optuna_limit_trials:raise
         #study.optimize(objective, n_trials=50, timeout=600,pruner=optuna.pruners.MedianPruner())
-        hypertuner_config = project.full_config.train.hypertuner_config if hasattr(project.full_config.train,"hypertuner_config") else {'n_trials':10}
+        hypertuner_config = project.full_config.train.hypertuner_config if hasattr(project.full_config.train,"hypertuner_config") else {'n_trials':3}
         study.optimize(objective, **hypertuner_config)
         del model
         torch.cuda.empty_cache()

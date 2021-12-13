@@ -170,28 +170,8 @@ def parse_model(config):
     return real_name,name,config
 
 def parse_data_dict(user_dic):
-    name = ""
-    name += user_dic['global_dataset_type'] if 'global_dataset_type' in user_dic else ""
     dataset_name = user_dic['dataset_TYPE']
-    if 'SMSDataset' in dataset_name:
-        # filte 'Compact dataset setting'
-        type_predicted  =user_dic['dataset_args']['type_predicted']
-        target_predicted=user_dic['dataset_args']['target_predicted']
-        if 'range_clip' in user_dic:
-            user_dic['dataset_args']['range_clip'] = user_dic['range_clip']
-            del user_dic['range_clip']
-
-        dataset_flag = dataset_name
-        name += "SMSDataset{},{},{}".format(dataset_flag,type_predicted,target_predicted)
-
-    real_name = name
-    if 'dataset_norm' not in user_dic:user_dic['dataset_norm']='none'
-
-    if user_dic['dataset_norm']!='none':name+=".{}_norm".format(user_dic['dataset_norm'])
-    if 'image_transfermer' in  user_dic:
-        if user_dic['image_transfermer']!='none':
-            name+=".{}_Image".format(user_dic['image_transfermer'])
-            real_name+=".{}_Image".format(user_dic['image_transfermer'])
+    real_name =name= dataset_name
     user_dic['datasetname']=real_name
     return name,real_name,Config(user_dic)
 

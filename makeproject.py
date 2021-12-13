@@ -8,22 +8,22 @@ import numpy as np
 ######################
 trainbases= [Train_Base_Default.copy({"grad_clip":None,
                                      'warm_up_epoch':100,
-                                     'epoches': 300,
+                                     'epoches': 400,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':3000,
+                                     #'BATCH_SIZE':4000,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':False})]
 hypertuner= [Normal_Train_Default]
-# hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not_prune':True,
-#                                        'optimizer_list':{
-#                                                 'Adam':{'lr':[0.00001,0.0001],  'betas':[[0.5,0.9],0.999]},
-#                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
-#                                                 },
+hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':3},'not_prune':True,
+                                       'optimizer_list':{
+                                                'Adam':{'lr':[0.0005,0.005],  'betas':[[0.5,0.9],0.999]},
+                                                #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
+                                                },
                                        #'drop_rate_range':[0.1,0.25],
-                                       #'grad_clip_list':[5],
-                                                        # })]
+                                       'grad_clip_list':[None,5],
+                                                        })]
 
 schedulers= [Scheduler_None]
 optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
@@ -38,21 +38,40 @@ train_config_list = [ConfigCombine({"base":[b,h], "scheduler":[s], "earlystop":[
                         for o in optimizers for e in earlystops
                         for a in anormal_detect]
 
+MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.MNIST','dataset_args':{'root':DATAROOT+f"/MNIST"}})
+dmlist=[
+           # (MNIST_DATA_Config,
+           #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
+                                     # 'backbone_config':{'virtual_bond_dim':8,'init_std':1},
+                                     # 'train_batches':1000
+                                     # })
+           # ),
+           (MNIST_DATA_Config.copy({'crop':24}),
+            backbone_templete.copy({'backbone_TYPE':'LinearCombineModel3',
+                                     'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
+                                     'train_batches':3500
+                                     })
+            ),
+            # (MNIST_DATA_Config.copy({'crop':24}),
+            #  backbone_templete.copy({'backbone_TYPE':'TensorNetworkDeepModel1',
+            #                           'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
+            #                           'train_batches':4000
+            #                           })
+            #  ),
+            #  (MNIST_DATA_Config.copy(),
+            #   backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
+            #                        'backbone_config':{'virtual_bond_dim':"models/arbitary_shape/arbitary_shape_2.json",'init_std':1e-2},
+            #                        'train_batches':4000
+            #                        })
+            # ),
+        ]
 
-dataset_config_list=[Config({'dataset_TYPE':'datasets.MNIST',
-                             'dataset_args':{'root':DATAROOT+f"/MNIST"}})]
-model_config_list = [backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
-                                             'backbone_config':{'virtual_bond_dim':5,'init_std':1},
-
-                                             }
-                                             )]
 
 
 
 #### generate config
 for train_cfg in train_config_list:
-    for data_cfg in dataset_config_list:
-        for model_cfg in model_config_list:
+    for data_cfg,model_cfg in dmlist:
             cfg = Merge(data_cfg, train_cfg, model_cfg)
             TIME_NOW        = time.strftime("%m_%d_%H_%M_%S")
             cfg.create_time = TIME_NOW
