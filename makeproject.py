@@ -46,7 +46,7 @@ dmlist=[
                                      # 'train_batches':1000
                                      # })
            # ),
-           (MNIST_DATA_Config.copy({'crop':24}),
+           (MNIST_DATA_Config,
             backbone_templete.copy({'backbone_TYPE':'LinearCombineModel3',
                                      'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
                                      'train_batches':3500
@@ -58,12 +58,12 @@ dmlist=[
             #                           'train_batches':4000
             #                           })
             #  ),
-            #  (MNIST_DATA_Config.copy(),
-            #   backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
-            #                        'backbone_config':{'virtual_bond_dim':"models/arbitary_shape/arbitary_shape_2.json",'init_std':1e-2},
-            #                        'train_batches':4000
-            #                        })
-            # ),
+             (MNIST_DATA_Config.copy({'reverse':True}),
+              backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
+                                   'backbone_config':{'virtual_bond_dim':"models/arbitary_shape/arbitary_shape_2.json",'init_std':1e-2},
+                                   'train_batches':4000
+                                   })
+            ),
         ]
 
 

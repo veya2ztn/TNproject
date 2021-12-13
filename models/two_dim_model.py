@@ -670,7 +670,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
         center_group       = 0
         damgling_num       = len(info_per_group)
-        info_per_group[center_group]['neighbor'].append(damgling_num)
+        info_per_group[center_group]['neighbor'].insert(0,damgling_num)#make sure the out index at the first rank so we can initialize it properly.
         info_per_line[(center_group,damgling_num)]={'D': out_features}
 
         self.info_per_group=info_per_group

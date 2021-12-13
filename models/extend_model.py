@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from .two_dim_model import *
-from pytorch_memlab import profile
+
 class Patch2NetworkInput(nn.Module):
     def __init__(self,divide):
         super().__init__()

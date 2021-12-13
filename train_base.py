@@ -57,9 +57,11 @@ def struct_dataloader(project_config,only_valid=False,verbose = True):
     DATASET_TYPE= project_config.data.dataset_TYPE
     DATASETargs = project_config.data.dataset_args
     transform   = [transforms.ToTensor()]
-    if hasattr(project_config.data,'crop') and project_config.data.crop is not None:
+    if hasattr(project_config.data,'crop') and project_config.data.crop:
         transform.append(transforms.CenterCrop(project_config.data.crop))
-    if hasattr(project_config.data,'divide') and project_config.data.divide is not None:
+    if hasattr(project_config.data,'reverse') and project_config.data.reverse:
+        transform.append(lambda x:1-x)#some mode will reverse in the patch layer
+    if hasattr(project_config.data,'divide') and project_config.data.divide:
         transform.append(lambda x:custom_2d_patch(x,project_config.data.divide))
     transform   = transforms.Compose(transform)
     if only_valid:
