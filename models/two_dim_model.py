@@ -146,7 +146,9 @@ class PEPS_einsum_uniform_shape_6x6_fast(PEPS_einsum_uniform_shape):
         path_record = {}
         super().__init__(6,6,out_features,**kargs)
     def forward(self,input_data):
+
         bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
+
         bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
         edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
         corn_tensors = self.einsum_engine("  lpab,klp->lkab"  ,self.corn_tensors,corn_input)

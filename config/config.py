@@ -165,7 +165,8 @@ def parse_model(config):
     if hasattr(config,'backbone_alias') and config.backbone_alias  is not None:
         real_name = config.backbone_alias
     elif hasattr(config,'backbone_config') and config.backbone_config is not None:
-        real_name = config.backbone_TYPE
+        if 'virtual_bond_dim' in config.backbone_config:
+            real_name += f".v={config.backbone_config['virtual_bond_dim']}"
     #name += ".cr,{}".format(config.criterion_type) if config.criterion_type!="default" else ""
     return real_name,name,config
 

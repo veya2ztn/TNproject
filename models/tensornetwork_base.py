@@ -63,7 +63,7 @@ class TN_Base(nn.Module):
         tensor     = init_std * torch.randn(*shape)+ bias_mat
         #tensor    /= tensor.norm()
         return tensor
-        
+
     @staticmethod
     def batch_together(inputs,svd_kargs=None):
         inputs= inputs.permute(1,2,0)#(B,num,k)->(num,k,B)
@@ -123,6 +123,7 @@ class TN_Base(nn.Module):
 
     @staticmethod
     def flatten_image_input(batch_image_input):
+        if len(batch_image_input.shape)==5:batch_image_input=batch_image_input.squeeze(1)
         bulk_input = batch_image_input[...,1:-1,1:-1,:].flatten(1,2)
         edge_input = torch.cat([batch_image_input[...,0,1:-1,:],
                                 batch_image_input[...,1:-1,[0,-1],:].flatten(-3,-2),

@@ -1,3 +1,4 @@
+
 import time
 from config import*
 import numpy as np
@@ -18,7 +19,7 @@ trainbases= [Train_Base_Default.copy({"grad_clip":None,
 hypertuner= [Normal_Train_Default]
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':3},'not_prune':True,
                                        'optimizer_list':{
-                                                'Adam':{'lr':[0.0005,0.005],  'betas':[[0.5,0.9],0.999]},
+                                                'Adam':{'lr':[0.0001,0.005],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
                                                 },
                                        #'drop_rate_range':[0.1,0.25],
@@ -39,35 +40,42 @@ train_config_list = [ConfigCombine({"base":[b,h], "scheduler":[s], "earlystop":[
                         for a in anormal_detect]
 
 MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.MNIST','dataset_args':{'root':DATAROOT+f"/MNIST"}})
-dmlist=[
-           # (MNIST_DATA_Config,
-           #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
-                                     # 'backbone_config':{'virtual_bond_dim':8,'init_std':1},
-                                     # 'train_batches':1000
-                                     # })
-           # ),
-           (MNIST_DATA_Config,
-            backbone_templete.copy({'backbone_TYPE':'LinearCombineModel3',
-                                     'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
-                                     'train_batches':3500
-                                     })
-            ),
-            # (MNIST_DATA_Config.copy({'crop':24}),
-            #  backbone_templete.copy({'backbone_TYPE':'TensorNetworkDeepModel1',
-            #                           'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
-            #                           'train_batches':4000
-            #                           })
-            #  ),
-             (MNIST_DATA_Config.copy({'reverse':True}),
-              backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
-                                   'backbone_config':{'virtual_bond_dim':"models/arbitary_shape/arbitary_shape_2.json",'init_std':1e-2},
-                                   'train_batches':4000
-                                   })
-            ),
+# dmlist=[
+#            # (MNIST_DATA_Config,
+#            #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
+#                                      # 'backbone_config':{'virtual_bond_dim':8,'init_std':1},
+#                                      # 'train_batches':1000
+#                                      # })
+#            # ),
+#            # (MNIST_DATA_Config,
+#            #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel3',
+#            #                           'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
+#            #                           'train_batches':3500
+#            #                           })
+#            #  ),
+#             (MNIST_DATA_Config.copy({'crop':24}),
+#              backbone_templete.copy({'backbone_TYPE':'TensorNetworkDeepModel1',
+#                                       'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
+#                                       'train_batches':4000
+#                                       })
+#              ),
+#              (MNIST_DATA_Config.copy({'reverse':True}),
+#               backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
+#                                    'backbone_config':{'virtual_bond_dim':"models/arbitary_shape/arbitary_shape_2.json",'init_std':1e-2},
+#                                    'train_batches':4000
+#                                    })
+#             ),
+#         ]
+
+
+dmlist=[(MNIST_DATA_Config.copy({'crop':24,'divide':4}),
+         backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_uniform_shape_6x6_fast',
+                                      'backbone_config':{'virtual_bond_dim':vd,'init_std':1e-5,'in_physics_bond':16},
+                                      'train_batches':Bs
+                                      })
+             ) for vd,Bs in [[3,20000],[4,10000],[5,3000],[6,1400]]
+
         ]
-
-
-
 
 #### generate config
 for train_cfg in train_config_list:
