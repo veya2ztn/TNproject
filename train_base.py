@@ -435,6 +435,17 @@ def train_for_one_task(model,project):
     print("-------------------------------------------------------------------------------------------")
     print("now trainning project: <|{}|>".format(PROJECTNAME))
     print("-------------------------------------------------------------")
+
+    MODEL_NAME  =project.full_config.model.str_backbone_TYPE
+    if "virtual_bond_dim" in project.full_config.model.backbone_config:
+        virtual_bond_dim=project.full_config.model.backbone_config['virtual_bond_dim']
+        if "_v" not in MODEL_NAME and virtual_bond_dim is not None:
+            MODEL_NAME += f"_v{virtual_bond_dim}"
+
+    DATASET_NAME=".".join(PROJECTNAME.split('.')[1:])
+    DB_NAME     = project.full_config.project_task_name
+    TASK_NAME   = project.full_config.project_json_name.split(".")[0]
+    SAVE__DIR   = os.path.join(SAVEROOT,'checkpoints',DATASET_NAME,MODEL_NAME)
     train_mode  = project_config.train_mode if hasattr(project_config,"train_mode") else "new"
     project.train_mode=train_mode
     if train_mode in ["new","replicate"]:
@@ -445,9 +456,7 @@ def train_for_one_task(model,project):
             random_seed=int(project_config.random_seed) if train_mode == 'replicate' else random.randint(1, 100000)
             TIME_NOW  = time.strftime("%m_%d_%H_%M_%S")
             TRIAL_NOW = '{}-seed-{}'.format(TIME_NOW,random_seed)
-            MODEL_NAME  =project.full_config.model.str_backbone_TYPE
-            DATASET_NAME=".".join(PROJECTNAME.split('.')[1:])
-            save_checkpoint   = os.path.join(SAVEROOT,'checkpoints',DATASET_NAME,MODEL_NAME,TRIAL_NOW)
+            save_checkpoint= os.path.join(SAVE__DIR,TRIAL_NOW)
             logsys         = LoggingSystem(True,save_checkpoint,seed=random_seed)
             model          = struct_model(project_config,train_loader.dataset)
             #################################################################################
@@ -459,17 +468,12 @@ def train_for_one_task(model,project):
             shutil.copy(project.project_json_config_path,project_root_dir)
     elif train_mode == "optuna":
         import optuna
-        MODEL_NAME  =project.full_config.model.str_backbone_TYPE
-        DATASET_NAME=".".join(PROJECTNAME.split('.')[1:])
-        DB_NAME     = project.full_config.project_task_name
-        TASK_NAME   = project.full_config.project_json_name.split(".")[0]
+
         def objective(trial):
             random_seed =random.randint(1, 100000)
             TIME_NOW    = time.strftime("%m_%d_%H_%M_%S")
             TRIAL_NOW   = '{}-seed-{}'.format(TIME_NOW,random_seed)
-            MODEL_NAME  =project.full_config.model.str_backbone_TYPE
-            DATASET_NAME=".".join(PROJECTNAME.split('.')[1:])
-            save_checkpoint   = os.path.join(SAVEROOT,'checkpoints',DATASET_NAME,MODEL_NAME,TRIAL_NOW)
+            save_checkpoint   = os.path.join(SAVE__DIR,TRIAL_NOW)
             logsys            = LoggingSystem(True,save_checkpoint,bar_log_path=f"runtime_log/bar_for_job_on_GPU{project.full_config.gpu}",seed=random_seed)
             if not os.path.exists(save_checkpoint):os.makedirs(save_checkpoint)
             project_root_dir  = os.path.join(save_checkpoint,'project_config.json')

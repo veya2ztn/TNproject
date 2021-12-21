@@ -51,6 +51,16 @@ class CNNCombineModel(nn.Module):
         self.network_layer= PEPS_uniform_shape_symmetry_any(W=24//divide,H=24//divide,in_physics_bond=out_channel*divide*divide,out_features=16,**kargs)
         self.classifier   = nn.Linear(16,out_features)
 
+    def load_from(self,path):
+        checkpoint = torch.load(path)
+        if ('state_dict' not in checkpoint):
+            self.load_state_dict(checkpoint)
+        else:
+            self.load_state_dict(checkpoint['state_dict'])
+            if 'optimizer' in checkpoint and hasattr(self,'optimizer') and self.optimizer is not None:
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+            if 'use_focal_loss' in checkpoint:self.focal_lossQ=checkpoint['use_focal_loss']
+
     def forward(self,x):
         x = self.feature_layer(x)
         x = self.data_align(x)

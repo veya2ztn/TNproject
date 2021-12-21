@@ -148,3 +148,13 @@ class TN_Base(nn.Module):
             # for now, we will compute path at outside since we need build the contraction map
             # in __init__ phase. So build map at that time make sense
             return self.einsum(*operands,optimize=optimize)
+
+    def load_from(self,path):
+        checkpoint = torch.load(path)
+        if ('state_dict' not in checkpoint):
+            self.load_state_dict(checkpoint)
+        else:
+            self.load_state_dict(checkpoint['state_dict'])
+            if 'optimizer' in checkpoint and hasattr(self,'optimizer') and self.optimizer is not None:
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+            if 'use_focal_loss' in checkpoint:self.focal_lossQ=checkpoint['use_focal_loss']

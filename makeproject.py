@@ -19,7 +19,7 @@ trainbases= [Train_Base_Default.copy({"grad_clip":None,
 hypertuner= [Normal_Train_Default]
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':3},'not_prune':True,
                                        'optimizer_list':{
-                                                'Adam':{'lr':[0.0001,0.005],  'betas':[[0.5,0.9],0.999]},
+                                                'Adam':{'lr':[0.001,0.01],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
                                                 },
                                        #'drop_rate_range':[0.1,0.25],
@@ -27,7 +27,8 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':3},'not_
                                                         })]
 
 schedulers= [Scheduler_None]
-optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
+schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
+optimizers= [Optimizer_Adam.copy({"config":{"lr":0.01}})]
 earlystops= [Earlystop_NMM_Default.copy({"_TYPE_":"no_min_more","config":{"es_max_window":40}})]
 anormal_detect= [Anormal_D_DC_Default.copy({"_TYPE_":"decrease_counting",
                                       "config":{"stop_counting":30,
@@ -39,7 +40,7 @@ train_config_list = [ConfigCombine({"base":[b,h], "scheduler":[s], "earlystop":[
                         for o in optimizers for e in earlystops
                         for a in anormal_detect]
 
-MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.MNIST','dataset_args':{'root':DATAROOT+f"/MNIST"}})
+MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.FashionMNIST','dataset_args':{'root':DATAROOT+f"/FashionMNIST",'download':True}})
 # dmlist=[
 #            # (MNIST_DATA_Config,
 #            #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
@@ -70,10 +71,12 @@ MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.MNIST','dataset_args':{'root'
 
 dmlist=[(MNIST_DATA_Config.copy({'crop':24,'divide':4}),
          backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_uniform_shape_6x6_fast',
-                                      'backbone_config':{'virtual_bond_dim':vd,'init_std':1e-5,'in_physics_bond':16},
+                                      'backbone_config':{'virtual_bond_dim':vd,'init_std':4e-2,'in_physics_bond':16},
                                       'train_batches':Bs
                                       })
-             ) for vd,Bs in [[3,20000],[4,10000],[5,3000],[6,1400]]
+             ) for vd,Bs in [
+             #[3,20000],[4,10000],[5,3000],
+             [6,1400]]
 
         ]
 
