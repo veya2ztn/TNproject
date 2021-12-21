@@ -44,7 +44,7 @@ def submatrix_test_full_contraction_einsum(D=5,L=5,W=None,B=1,H=None,
     # for t in tn2D_shape_list:
     #     for s in t:print(s,end=' ')
     #     print("========")
-    path,sublist_list,outlist = get_best_path(tn2D_shape_list,store=path_recorder,type='sub')
+    path,sublist_list,outlist = get_best_path(tn2D_shape_list,store=path_recorder,type='full')
     # node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
     # # re-align to get proper index order
     # #last_idx = outlist.pop()
