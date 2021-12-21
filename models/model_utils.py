@@ -147,6 +147,26 @@ def get_best_path(tn2D_shape_list,store=None,type='sub'):
                 json.dump(store,f)
     return path,sublist_list,outlist
 
+
+def full_size_array_string(*operands):
+    if isinstance(operands[0],str):
+        equation = operands[0]
+        tensor_l = operands[1:]
+        array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
+    else:
+        array_string=[]
+        for t in operands:
+            if isinstance(t,list):
+                # t is sublist
+                shape =[ l for l in t if l is not Ellipsis]
+                shape = "["+",".join([str(t) for t in shape])+"]"
+            else:
+                # t is a tensor
+                shape = list(t.shape)
+                shape = "("+",".join([str(t) for t in shape])+")"
+            array_string.append(shape)
+        array_string=','.join(array_string)
+    return array_string
 def get_best_path_via_oe(equation,tensor_l,store=None):
     saveQ = False
     path_store_path = None

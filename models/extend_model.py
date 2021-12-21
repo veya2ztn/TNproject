@@ -14,9 +14,11 @@ import numpy as np
 from .two_dim_model import *
 
 class Patch2NetworkInput(nn.Module):
-    def __init__(self,divide):
+    def __init__(self,divide,reverse=True):
         super().__init__()
         self.divide  = divide
+        self.reverse = reverse
+
     def forward(self,x):
         B, C , dim0, dim1 = tuple(x.shape)
         divide=self.divide
@@ -24,7 +26,8 @@ class Patch2NetworkInput(nn.Module):
         assert dim1%divide==0
         x     = x.reshape((B, C,dim0//divide,divide,dim1//divide,divide)).permute(0,2,4,3,5,1)
         x     = x.flatten(start_dim=-3,end_dim=-1)
-        return 1-x
+        if self.reverse:x=1-x
+        return x
 class LinearCombineModel1(nn.Module):
     def __init__(self,out_features=10,**kargs):
         super().__init__()

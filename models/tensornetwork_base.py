@@ -4,13 +4,24 @@ import torch.nn.functional as F
 import opt_einsum as oe
 from inspect import signature
 import numpy as np
+import os
+import json
+from .model_utils import full_size_array_string
+path_recorder  = "models/arbitrary_shape_path_recorder.json"
 class TN_Base(nn.Module):
-    def __init__(self,einsum_engine=torch.einsum):
+    def __init__(self,einsum_engine=torch.einsum,path_record=path_recorder):
         super().__init__()
         if einsum_engine == torch.einsum and 'optimize' in signature(torch.einsum).parameters:
             self.einsum = torch.einsum
         else:
             self.einsum = oe.contract
+        if path_record is not None:
+            if isinstance(path_record,str):
+                with open(path_record,'r') as f:
+                    self.path_record = json.load(f)
+                self.path_record_file = path_record
+            else:
+                self.path_record = path_record
     @staticmethod
     def rde1(shape,init_std):
         if len(shape) == 2:
@@ -121,33 +132,31 @@ class TN_Base(nn.Module):
             now_tensor = torch.einsum("ik,kj->ij",now_tensor, next_tensor)
         return now_tensor
 
+
     @staticmethod
     def flatten_image_input(batch_image_input):
         if len(batch_image_input.shape)==5:batch_image_input=batch_image_input.squeeze(1)
-        bulk_input = batch_image_input[...,1:-1,1:-1,:].flatten(1,2)
+        bulk_input = batch_image_input[...,1:-1,1:-1,:].flatten(-3,-2)
         edge_input = torch.cat([batch_image_input[...,0,1:-1,:],
                                 batch_image_input[...,1:-1,[0,-1],:].flatten(-3,-2),
                                 batch_image_input[...,-1,1:-1,:]
-                               ],1)
-        corn_input = batch_image_input[...,[0,0,-1],[0,-1,0],:]
-        cent_input = batch_image_input[...,-1,-1,:]
-        return bulk_input,edge_input,corn_input,cent_input
+                               ],-2)
+        corn_input = batch_image_input[...,[0,0,-1,-1],[0,-1,0,-1],:]
+        return bulk_input,edge_input,corn_input
 
     def einsum_engine(self,*operands,optimize=None):
         #path_id,equation,*batch_input):
-        if not hasattr(self,'path_record'):self.path_record={}
-        if isinstance(operands[0],str):
-            equation = operands[0]
-            tensor_l = operands[1:]
-            array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
-            if array_string not in self.path_record:
-                self.path_record[array_string] = oe.contract_path(equation, *tensor_l,optimize='random-greedy')[0]
-            return self.einsum(equation,*tensor_l, optimize=self.path_record[array_string])
-        else:
-            assert optimize is not None
+        if optimize is not None:
             # for now, we will compute path at outside since we need build the contraction map
             # in __init__ phase. So build map at that time make sense
             return self.einsum(*operands,optimize=optimize)
+        if not hasattr(self,'path_record'):self.path_record={}
+        array_string = full_size_array_string(*operands)
+        if array_string not in self.path_record:
+            self.path_record[array_string] = oe.contract_path(*operands,optimize='random-greedy')[0]
+            if hasattr(self,'path_record_file'):
+                with open(self.path_record_file,'w') as f:json.dump(self.path_record,f)
+        return self.einsum(*operands, optimize=self.path_record[array_string])
 
     def load_from(self,path):
         checkpoint = torch.load(path)
