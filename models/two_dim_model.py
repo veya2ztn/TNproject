@@ -465,6 +465,71 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
             else:raise NotImplementedError
         return tensor_list
 
+# class PEPS_uniform_shape_symmetry_any_old(PEPS_uniform_shape_symmetry_base):
+#     def __init__(self, **kargs):
+#         super().__init__(**kargs)
+#         W = self.W;
+#         H = self.H
+#         O = self.O
+#         P = self.P
+#         D = self.D
+#         self.LW = LW = W//2
+#         self.LH = LH = H//2
+#         tn2D_shape_list                = [ [(D,D,O)]+[  (D,D,D)]*(LH-1) ]+ \
+#                                          [ [(D,D,D)]+[(D,D,D,D)]*(LH-1)]*(LW-1)
+#         path,sublist_list,outlist = get_best_path(tn2D_shape_list,store=path_recorder,type='sub')
+#         #node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
+#         #path,info                      = get_optim_path_by_oe_from_tn(node_list)
+#         last_idx = outlist.pop()
+#         outlist.insert(LH,last_idx)
+#         #print(outlist)
+#         #outlist should be [2, 6, 12, 18, 13, 15, 17] for 3x3
+#         self.sublist_list = sublist_list
+#         self.outlist      = outlist
+#         self.path         = path
+#
+#         self.path_record  = {}
+#         self.path_final= None
+#     def forward(self,input_data):
+#         bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
+#         corn_input   = torch.cat([corn_input,cent_input.unsqueeze(1)],1)
+#         bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
+#         edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
+#         corn_tensors = self.einsum_engine("  lopab,klp->lkabo" ,self.corn_tensors,corn_input)
+#         L = len(bulk_tensors)
+#         remain = bulk_tensors.shape[1:]
+#         bulk_tensors = bulk_tensors.reshape(4,L//4,*remain)
+#
+#         L = len(edge_tensors)
+#         remain = edge_tensors.shape[1:]
+#         edge_tensors = edge_tensors.reshape(4,L//4,*remain)
+#
+#         LH = self.LH
+#         LW = self.LW
+#         tensor_list  =[[corn_tensors]        + list(edge_tensors[:LH-1]) ]+\
+#                       [[edge_tensors[LH-1+i]]+ list(bulk_tensors[(LH-1)*i:(LH-1)*(i+1)])
+#                                                                     for i in range(LW-1)]
+#         tensor_list     = [l for t in tensor_list for l in t]
+#         assert len(tensor_list)==len(self.sublist_list)
+#         operands=[]
+#         for tensor,sublist in zip(tensor_list,self.sublist_list):
+#             operand = [tensor,[...,*sublist]]
+#             operands+=operand
+#         operands+= [[...,*(self.outlist)]]
+#
+#         # in this case W==H , LW==LH
+#
+#         quater_contraction = self.einsum_engine(*operands,optimize=self.path).flatten(-2*LW,-LW-1).flatten(-LW,-1)
+#
+#         tensor  = self.einsum_engine("lkmab,lknbc->lkmnac",
+#                               quater_contraction[[0,2]],quater_contraction[[1,3]]
+#                               ).flatten(-4,-3)# -> (2,B,O^2,D^3,D^3)
+#         tensor  = self.einsum_engine("kmab,knba->kmn",
+#                               tensor[0],tensor[1]
+#                               ).flatten(-2,-1)# -> (B,O^4)
+#         return tensor
+
+
 class PEPS_uniform_shape_symmetry_6x6(PEPS_uniform_shape_symmetry_base):
     '''
     same performance as PEPS_uniform_shape_symmetry_any(W=6,H=6    )
