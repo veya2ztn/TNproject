@@ -699,6 +699,7 @@ class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
     def forward(self,input_data):
         LH = self.LH
         LW = self.LW
+        D  = self.D
         bulk_tensors,edge_tensors,corn_tensors = self.get_batch_contraction_network(input_data)
         corn_tensors = self.pick_tensors(self.partrules[0],self.indexrules[0],corn_tensors,edge_tensors,bulk_tensors)
         corn = self.einsum_engine("lkoab,lkcdb,lkefcg,lkgah->lkohedf",*corn_tensors).flatten(-4,-3).flatten(-2,-1)
