@@ -32,7 +32,7 @@ def custom_2d_patch(x,divide=4):
     assert dim1%divide==0
     x     = x.reshape((B, dim0//divide,divide,dim1//divide,divide)).permute(0,1,3,2,4)
     x     = x.flatten(start_dim=-2,end_dim=-1)
-    return (1-x)
+    return x
 
 #torch.autograd.set_detect_anomaly(True)
 def struct_model(project_config,dataset_train,cuda=True):
@@ -134,6 +134,7 @@ def train_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,
     while inter_b.update_step():
         image,label= prefetcher.next()
         model.optimizer.zero_grad()
+
         logit  = model(image)
         logit  = logit.squeeze()
         loss   = torch.nn.CrossEntropyLoss()(logit,label)
@@ -340,6 +341,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
             # depend on will the first epoch reveal the model performance, default is will
             if hasattr(train_loader.sampler,'set_epoch'):train_loader.sampler.set_epoch(epoch)
             train_loss,train_accu = train_epoch(model,train_loader,logsys)
+
             if np.isnan(train_loss) or np.isnan(train_accu):raise NanValueError
             logsys.record('the_lr_use_now', model.optimizer.param_groups[0]['lr'] , epoch)
             logsys.record('training_loss', train_loss, epoch)
@@ -368,7 +370,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
             for accu_type in accu_list:
                 logsys.record(accu_type, valid_acc_pool[accu_type], epoch)
                 logsys.record('best_'+accu_type, metric_dict['best_'+accu_type][accu_type], epoch)
-            logsys.banner_show(epoch,FULLNAME,train_losses=[train_loss])
+            #logsys.banner_show(epoch,FULLNAME,train_losses=[train_loss])
             earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
 
             # if model.scheduler is not None:

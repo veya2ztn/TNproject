@@ -165,6 +165,10 @@ def parse_model(config):
     if hasattr(config,'backbone_alias') and config.backbone_alias  is not None:
         real_name = config.backbone_alias
     elif hasattr(config,'backbone_config') and config.backbone_config is not None:
+        if 'W' in config.backbone_config:
+            real_name += f"_W{config.backbone_config['W']}"
+        if 'H' in config.backbone_config:
+            real_name += f"_H{config.backbone_config['H']}"
         if 'virtual_bond_dim' in config.backbone_config:
             real_name += f"_v{config.backbone_config['virtual_bond_dim']}"
     #name += ".cr,{}".format(config.criterion_type) if config.criterion_type!="default" else ""
@@ -229,7 +233,13 @@ def read_model(user_dic):
         if 'backbone_alias' in user_dic and user_dic['backbone_alias'] is not None:
             user_dic['str_backbone_TYPE'] = user_dic['backbone_alias']
         else:
-            user_dic['str_backbone_TYPE']=user_dic["backbone_TYPE"]+f"_v{backbone_config['virtual_bond_dim']}"
+            user_dic['str_backbone_TYPE'] =user_dic['backbone_TYPE']
+            if 'W' in backbone_config:
+                user_dic['str_backbone_TYPE'] += f"_W{backbone_config['W']}"
+            if 'H' in backbone_config:
+                user_dic['str_backbone_TYPE'] += f"_H{backbone_config['H']}"
+            if 'virtual_bond_dim' in backbone_config:
+                user_dic['str_backbone_TYPE'] += f"_v{backbone_config['virtual_bond_dim']}"
     else:
         if 'backbone_TYPE'  in user_dic:
             user_dic['str_backbone_TYPE']=user_dic['backbone_TYPE']
