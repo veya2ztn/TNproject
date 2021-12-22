@@ -167,3 +167,6 @@ class TN_Base(nn.Module):
             if 'optimizer' in checkpoint and hasattr(self,'optimizer') and self.optimizer is not None:
                 self.optimizer.load_state_dict(checkpoint['optimizer'])
             if 'use_focal_loss' in checkpoint:self.focal_lossQ=checkpoint['use_focal_loss']
+
+    def weight_init(self):
+        raise NotImplementedError

@@ -41,6 +41,8 @@ def struct_model(project_config,dataset_train,cuda=True):
 
     #W,H,P            = dataset_train[0][0].shape[-3:]
     model            = eval(f"mdl.{MODEL_TYPE}")(**MODEL_CONIFG)
+    if hasattr(project_config.model,'weight_init') and project_config.model.weight_init is not None:
+        model.weight_init(**project_config.model.weight_init)
     model            = model.cuda() if cuda else model
     if hasattr(project_config.model,'pre_train_weight'):
         pre_train_weight  = project_config.model.pre_train_weight
@@ -57,6 +59,11 @@ def struct_dataloader(project_config,only_valid=False,verbose = True):
     DATASET_TYPE= project_config.data.dataset_TYPE
     DATASETargs = project_config.data.dataset_args
     transform   = [transforms.ToTensor()]
+    if hasattr(project_config.data,'p_norm') and project_config.data.p_norm:
+        statisticinfo= torch.load(project_config.data.p_norm)
+        statistic_std= statisticinfo['statisitc_std']
+        statistic_mean=statisticinfo['statisitc_mean']
+        transform.append(lambda x:(x-statistic_mean)/statistic_std)
     if hasattr(project_config.data,'crop') and project_config.data.crop:
         transform.append(transforms.CenterCrop(project_config.data.crop))
     if hasattr(project_config.data,'reverse') and project_config.data.reverse:
@@ -370,7 +377,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
             for accu_type in accu_list:
                 logsys.record(accu_type, valid_acc_pool[accu_type], epoch)
                 logsys.record('best_'+accu_type, metric_dict['best_'+accu_type][accu_type], epoch)
-            #logsys.banner_show(epoch,FULLNAME,train_losses=[train_loss])
+            logsys.banner_show(epoch,FULLNAME,train_losses=[train_loss])
             earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
 
             # if model.scheduler is not None:

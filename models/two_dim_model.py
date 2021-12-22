@@ -448,12 +448,30 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
         self.flag_matrix     = flag_matrix
         self.position_matrix = position_matrix
         self.cent_tensor_idx = position_matrix[self.W//2,self.H//2] if self.W%2==1 else None
+
     def get_batch_contraction_network(self,input_data):
         bulk_input,edge_input,corn_input = self.flatten_image_input(input_data)
         bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
         edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
         corn_tensors = self.einsum_engine(" lopab,klp->lkoab" ,self.corn_tensors,corn_input)
         return bulk_tensors,edge_tensors,corn_tensors
+
+    def weight_init(self,method=None,set_var=1):
+        if method is None:return
+        if method == "Expecatation_Normalization":
+            W          = self.W
+            H          = self.H
+            D          = self.D
+            P          = self.P
+            num_of_edge= (W-1)*H+(H-1)*W
+            num_of_unit= W*H
+            solved_var = np.power(set_var,1/num_of_unit)*np.power(1/D,num_of_edge/(num_of_unit))/P
+            solved_std = np.sqrt(solved_var)
+            self.corn_tensors = torch.nn.init.normal_(self.corn_tensors,mean=0.0, std=solved_std)
+            self.edge_tensors = torch.nn.init.normal_(self.edge_tensors,mean=0.0, std=solved_std)
+            self.bulk_tensors = torch.nn.init.normal_(self.bulk_tensors,mean=0.0, std=solved_std)
+        else:
+            raise NotImplementedError
 
     @staticmethod
     def pick_tensors(partrule,indexrule,corn_tensors,edge_tensors,bulk_tensors):
@@ -616,7 +634,7 @@ class PEPS_uniform_shape_symmetry_any(PEPS_uniform_shape_symmetry_base):
 class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
     def __init__(self, nonlinear_layer=nn.Tanh(),
                        normlized_layer_module=nn.InstanceNorm3d,
-                       init_std=1e-10,**kargs):
+                       init_std=1e-10,normlized=True, set_var=1,**kargs):
         super().__init__(**kargs)
         H = self.H
         W = self.W
@@ -624,6 +642,9 @@ class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
         LH= self.LH
         D = self.D
         O = self.O
+        P = self.P
+        if normlized:
+            self.weight_init(method="Expecatation_Normalization",set_var=set_var)
 
         flag_matrix     = self.flag_matrix
         position_matrix = self.position_matrix
@@ -672,14 +693,17 @@ class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
         self.indexrules = indexrules
         self.partrules  = partrules
         self.edge_contraction_path = edge_contraction_path
+        self.nonlinear_layer = nonlinear_layer
+        self.normlized_layers = nn.ModuleList([normlized_layer_module(O,affine=True) for _ in self.partrules])
+
     def forward(self,input_data):
         LH = self.LH
         LW = self.LW
         bulk_tensors,edge_tensors,corn_tensors = self.get_batch_contraction_network(input_data)
         corn_tensors = self.pick_tensors(self.partrules[0],self.indexrules[0],corn_tensors,edge_tensors,bulk_tensors)
-        corn = self.einsum_engine("lkoab,lkcdb,lkefcg,lkgha->lkohedf",*corn_tensors).flatten(-4,-3).flatten(-2,-1)
-        #corn = self.nonlinear_layer(corn)
-        #corn = self.normlized_layers[0](corn)
+        corn = self.einsum_engine("lkoab,lkcdb,lkefcg,lkgah->lkohedf",*corn_tensors).flatten(-4,-3).flatten(-2,-1)
+        corn = self.nonlinear_layer(corn)# (4,B,O,D,D)
+        corn = self.normlized_layers[0](corn.permute(1,2,0,3,4)).permute(2,0,1,3,4)
         for i,(partrule, indexrule) in enumerate(zip(self.partrules[1:],self.indexrules[1:])):
             path,sublist_list,outlist = self.edge_contraction_path[i]
             edge_tensors= self.pick_tensors(partrule['edge'],indexrule['edge'],corn_tensors,edge_tensors,bulk_tensors)
@@ -687,11 +711,11 @@ class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
             L           = len(edge_tensors)
             operands    = structure_operands(edge_tensors,sublist_list,outlist)
             edge1,edge2 = self.einsum_engine(*operands,optimize=path).flatten(-L-L,-L-1).flatten(-L,-1)
-            corn = self.einsum_engine("lkoab,lkcdb,lkefcg,lkgha->lkohedf",corn ,edge1,cent_tensor,edge2).flatten(-4,-3).flatten(-2,-1)
-
-            #corn = self.nonlinear_layer(corn)
-            #corn = self.normlized_layers[i+1](corn)
+            corn = self.einsum_engine("lkoab,lkcdb,lkefcg,lkgah->lkohedf",corn ,edge1,cent_tensor,edge2).flatten(-4,-3).flatten(-2,-1)
+            corn = self.nonlinear_layer(corn)
+            corn = self.normlized_layers[i+1](corn.permute(1,2,0,3,4)).permute(2,0,1,3,4)
         # corn now is a tensor (B,4,D^(L/2),D^(L/2))
+        corn   = corn/D**(LW/3)# basicly should use LW/4 but use LW/3 to avoid gradient vanish
         corn   = self.einsum_engine("kvab,kxbc,kycd,kzda->kvxyz",*corn).flatten(-4,-1)# -> (B,O^4)
         return corn
 
@@ -817,6 +841,24 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         self.unit_list = [nn.Parameter(v) for v in unit_list]
         for i, v in enumerate(self.unit_list):
             self.register_parameter(f'unit_{i}', param=v)
+
+    def weight_init(self,method=None,set_var=1):
+        if method is None:return
+        if method == "Expecatation_Normalization":
+            info_per_group=self.info_per_group
+            info_per_line =self.info_per_line
+            info_per_point=self.info_per_point
+
+            num_of_tensor   = len(info_per_group)
+            list_of_virt_dim= [t['D'] for k,t in info_per_line.items() if k < len(info_per_line)-1]
+            # the output dimension need exclude
+            list_of_phys_dim= [len(t['element']) for t in info_per_group.values()]
+            divider         = np.prod([np.power(t,1/num_of_tensor) for t in list_of_phys_dim+list_of_virt_dim])
+            solved_var      = np.power(seted_variation,1/num_of_tensor)/divider
+            solved_std      = np.sqrt(solved_var)
+            self.unit_list  = [torch.nn.init.normal_(v,mean=0.0, std=solved_std) for v in self.unit_list]
+        else:
+            raise NotImplementedError
 
     def forward(self,input_data):
         #input data shape B,1,W,H

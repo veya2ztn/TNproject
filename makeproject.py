@@ -16,15 +16,15 @@ trainbases= [Train_Base_Default.copy({"grad_clip":None,
                                      'do_extra_phase':False,
                                      'doearlystop':True,
                                      'doanormaldt':True})]
-#hypertuner= [Normal_Train_Default]
-hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not_prune':True,
-                                       'optimizer_list':{
-                                                'Adam':{'lr':[0.0001,0.005],  'betas':[[0.5,0.9],0.999]},
-                                                #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
-                                                },
-                                       #'drop_rate_range':[0.1,0.25],
-                                       'grad_clip_list':[None],
-                                                        })]
+hypertuner= [Normal_Train_Default]
+# hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not_prune':True,
+#                                        'optimizer_list':{
+#                                                 'Adam':{'lr':[0.0001,0.005],  'betas':[[0.5,0.9],0.999]},
+#                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
+#                                                 },
+#                                        #'drop_rate_range':[0.1,0.25],
+#                                        'grad_clip_list':[None],
+#                                                         })]
 
 schedulers= [Scheduler_None]
 schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
@@ -48,18 +48,18 @@ dmlist=[
            #                           'train_batches':100
            #                           })
            # ),
-           (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
-            backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
-                                     'backbone_config':{'W':6,'H':6,'virtual_bond_dim':6,'in_physics_bond':16,'init_std': 1e-5},
-                                     'train_batches':1400
-                                     })
-            ),
-            # (MNIST_DATA_Config.copy({'crop':24}),
-            #  backbone_templete.copy({'backbone_TYPE':'TensorNetworkDeepModel1',
-            #                           'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5},
-            #                           'train_batches':4000
-            #                           })
-            #  ),
+           # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
+           #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
+           #                           'backbone_config':{'W':6,'H':6,'virtual_bond_dim':6,'in_physics_bond':16,'init_std': 1e-5},
+           #                           'train_batches':1400
+           #                           })
+           #  ),
+            (MNIST_DATA_Config.copy({'p_norm':DATAROOT+f"/MNIST/MNIST/statisitc_stdmean.pt",'crop':24}),
+             backbone_templete.copy({'backbone_TYPE':'TensorNetworkDeepModel1',
+                                      'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5,'normlized':True, 'set_var':1},
+                                      'train_batches':2000
+                                      })
+             ),
             #  (MNIST_DATA_Config.copy({'reverse':True}),
             #   backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
             #                        'backbone_config':{'virtual_bond_dim':"models/arbitary_shape/arbitary_shape_2.json",'init_std':1e-2},

@@ -80,9 +80,9 @@ class LinearCombineModel3(CNNCombineModel):
 class TensorNetworkDeepModel1(nn.Module):
     def __init__(self,out_features=10,divide=4,inp_channel=1,mid_channel=8,out_channel=16,**kargs):
         super().__init__()
-        self.data_align   = Patch2NetworkInput(divide)
+        self.data_align   = Patch2NetworkInput(divide,reverse=False)
         self.network_layer= PEPS_uniform_shape_symmetry_deep_model(W=24//divide,H=24//divide,
-                            in_physics_bond=16,out_features=16,
+                            in_physics_bond=divide*divide,out_features=16,
                             normlized_layer_module=nn.InstanceNorm3d,
                             nonlinear_layer=nn.Tanh(),
                             **kargs)
