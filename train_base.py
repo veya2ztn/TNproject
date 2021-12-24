@@ -268,7 +268,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     optimizer_config    = args.train.optimizer.config
     optimizer_TYPE      = args.train.optimizer._TYPE_
     lr = optimizer_config['lr']
-    optimizer           = eval(f"optim.{optimizer_TYPE}")([{'params':model.parameters(),'initial_lr':lr}, **optimizer_config)
+    optimizer           = eval(f"optim.{optimizer_TYPE}")([{'params':model.parameters(),'initial_lr':lr}], **optimizer_config)
 
     optimizer.grad_clip = args.train.grad_clip
 
