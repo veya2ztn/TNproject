@@ -267,19 +267,14 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
 
     optimizer_config    = args.train.optimizer.config
     optimizer_TYPE      = args.train.optimizer._TYPE_
-    optimizer           = eval(f"optim.{optimizer_TYPE}")(model.parameters(), **optimizer_config)
+    lr = optimizer_config['lr']
+    optimizer           = eval(f"optim.{optimizer_TYPE}")([{'params':model.parameters(),'initial_lr':lr}, **optimizer_config)
+
     optimizer.grad_clip = args.train.grad_clip
 
     criterion           = torch.nn.CrossEntropyLoss()
 
-    scheduler_config    = args.train.scheduler.config
-    scheduler_TYPE      = args.train.scheduler._TYPE_
-    scheduler           = eval(f"lrschdl.{scheduler_TYPE}")(optimizer, **scheduler_config) if args.train.scheduler._TYPE_ else None
-    if hasattr(args.train,'use_swa') and args.train.use_swa:
-        from torch.optim.swa_utils import AveragedModel, SWALR
-        print("active experiment feature: SWA")
-        swa_model           = None
-        swa_scheduler       = None
+
 
 
 
@@ -318,8 +313,16 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
         do_inference = True
         inference_once_only = True
 
-    if scheduler:scheduler.last_epoch = start_epoch - 1
-
+    #if scheduler:scheduler.last_epoch = start_epoch - 1
+    last_epoch = start_epoch - 1
+    scheduler_config    = args.train.scheduler.config
+    scheduler_TYPE      = args.train.scheduler._TYPE_
+    scheduler           = eval(f"lrschdl.{scheduler_TYPE}")(optimizer, last_epoch=last_epoch,**scheduler_config) if args.train.scheduler._TYPE_ else None
+    if hasattr(args.train,'use_swa') and args.train.use_swa:
+        from torch.optim.swa_utils import AveragedModel, SWALR
+        print("active experiment feature: SWA")
+        swa_model           = None
+        swa_scheduler       = None
 
     FULLNAME          = args.project_json_name #
     banner            = logsys.banner_initial(epoches,FULLNAME)
