@@ -782,21 +782,35 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         return self.einsum_engine(*operands,optimize=self.path)
 
 class PEPS_einsum_arbitrary_partition_optim(TN_Base):
-    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_dim="models/arbitary_shape/arbitary_shape_1.json",
-                       bias=True,label_position='center',init_std=1e-10,contraction_mode = 'recursion'):
+    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_config="models/arbitary_shape/arbitary_shape_1.json",
+                       bias=True,label_position='center',contraction_mode = 'recursion',
+                 init_std=1e-10,
+                 seted_variation=10,
+                 solved_std=None):
         super().__init__()
-        if isinstance(virtual_bond_dim,str):
-            arbitary_shape_state_dict = torch.load(virtual_bond_dim)
+        if isinstance(virtual_bond_config,str):
+            arbitary_shape_state_dict = torch.load(virtual_bond_config)
         else:
-            arbitary_shape_state_dict = virtual_bond_dim
+            arbitary_shape_state_dict = virtual_bond_config
         assert isinstance(arbitary_shape_state_dict,dict)
+
+
         info_per_group = arbitary_shape_state_dict['node']
         info_per_line  = arbitary_shape_state_dict['line']
         info_per_point = arbitary_shape_state_dict['element']
 
-        center_group       = 0
-        damgling_num       = len(info_per_group)
-        info_per_group[center_group]['neighbor'].insert(0,damgling_num)#make sure the out index at the first rank so we can initialize it properly.
+        if solved_std is None:
+            num_of_tensor   = len(info_per_group)
+            list_of_virt_dim= [t['D'] for t in info_per_line.values()]
+            list_of_phys_dim= [len(t['element']) for t in info_per_group.values()]
+            divider         = np.prod([np.power(t,1/num_of_tensor) for t in list_of_phys_dim+list_of_virt_dim])
+            solved_var      = np.power(seted_variation,1/num_of_tensor)/divider
+            solved_std      = np.sqrt(solved_var)
+
+
+        center_group    = 0
+        damgling_num    = len(info_per_group)
+        info_per_group[center_group]['neighbor'].insert(0,damgling_num)
         info_per_line[(center_group,damgling_num)]={'D': out_features}
 
         self.info_per_group=info_per_group
@@ -827,39 +841,33 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             sublist_list.append(sublist)
         operands+= [[...,*outlist]]
         path,info = oe.contract_path(*operands,optimize='random-greedy-128')
-
         self.path         = path
         self.sublist_list = sublist_list
         self.outlist      = outlist
 
+        # assume all element for the tensornetwork is indenpendent.
+        # The bond (include physics) list is l0,l1,l2,...,ln
+        # All element follow normal distribution X - sigma(0,alpha)
+        # where alpha is the variation we need to calculated.
+        # the output after contracting is also a tensor (may 1-rank scalar, 2-rank matrix, etc)
+        # the element of the output follow the composite normal distribution Y - sigma(0,beta)
+        # where beta = l0 x l1 x l2 x ... x ln x alpha^(# of tensor)
+
         unit_list = []
         for i in range(len(sublist_list)):
             shape = ranks_list[i]
-            P     = len(info_per_group[i]['element'])
-            unit_list.append(self.rde2D((P,*shape),init_std,offset= 2 if i==center_group else 1))
+            P        = len(info_per_group[i]['element'])
+            #control_mat = self.rde2D((P,*shape),0,physics_index=0,offset= 2 if i==center_group else 1)
+            #bias_mat    = torch.normal(0,solved_std,(P,*shape))
+            #bias_mat[control_mat.nonzero(as_tuple=True)]=0
+            #unit_list.append(control_mat+bias_mat)
+            #unit_list.append(self.rde2D((P,*shape),init_std,offset=1))
+            unit_list.append(torch.normal(mean=0,std=solved_std,size=(P,*shape)))
         assert len(unit_list)==len(sublist_list)
 
         self.unit_list = [nn.Parameter(v) for v in unit_list]
         for i, v in enumerate(self.unit_list):
             self.register_parameter(f'unit_{i}', param=v)
-
-    def weight_init(self,method=None,set_var=1):
-        if method is None:return
-        if method == "Expecatation_Normalization":
-            info_per_group=self.info_per_group
-            info_per_line =self.info_per_line
-            info_per_point=self.info_per_point
-
-            num_of_tensor   = len(info_per_group)
-            list_of_virt_dim= [t['D'] for k,t in info_per_line.items() if k < len(info_per_line)-1]
-            # the output dimension need exclude
-            list_of_phys_dim= [len(t['element']) for t in info_per_group.values()]
-            divider         = np.prod([np.power(t,1/num_of_tensor) for t in list_of_phys_dim+list_of_virt_dim])
-            solved_var      = np.power(seted_variation,1/num_of_tensor)/divider
-            solved_std      = np.sqrt(solved_var)
-            self.unit_list  = [torch.nn.init.normal_(v,mean=0.0, std=solved_std) for v in self.unit_list]
-        else:
-            raise NotImplementedError
 
     def forward(self,input_data):
         #input data shape B,1,W,H
@@ -871,6 +879,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             patch_idx  = self.info_per_group[i]['element_idx']
             batch_input= input_data[...,patch_idx] # B,P
             batch_unit = torch.tensordot(batch_input,unit,dims=([-1], [0]))
+            #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
             _input.append(batch_unit)
 
         operands=[]

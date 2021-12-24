@@ -28,7 +28,7 @@ hypertuner= [Normal_Train_Default]
 
 schedulers= [Scheduler_None]
 schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
-optimizers= [Optimizer_Adam.copy({"config":{"lr":0.01}})]
+optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
 earlystops= [Earlystop_NMM_Default.copy({"_TYPE_":"no_min_more","config":{"es_max_window":40}})]
 anormal_detect= [Anormal_D_DC_Default.copy({"_TYPE_":"decrease_counting",
                                       "config":{"stop_counting":30,
@@ -54,18 +54,18 @@ dmlist=[
            #                           'train_batches':1400
            #                           })
            #  ),
-            (MNIST_DATA_Config.copy({'p_norm':DATAROOT+f"/MNIST/MNIST/statisitc_stdmean.pt",'crop':24}),
-             backbone_templete.copy({'backbone_TYPE':'TensorNetworkDeepModel1',
-                                      'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5,'normlized':True, 'set_var':1},
-                                      'train_batches':2000
-                                      })
-             ),
-            #  (MNIST_DATA_Config.copy({'reverse':True}),
-            #   backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
-            #                        'backbone_config':{'virtual_bond_dim':"models/arbitary_shape/arbitary_shape_2.json",'init_std':1e-2},
-            #                        'train_batches':4000
-            #                        })
-            # ),
+            # (MNIST_DATA_Config.copy({'p_norm':DATAROOT+f"/MNIST/MNIST/statisitc_stdmean.pt",'crop':24}),
+            #  backbone_templete.copy({'backbone_TYPE':'TensorNetworkDeepModel1',
+            #                           'backbone_config':{'virtual_bond_dim':5,'init_std':1e-5,'normlized':True, 'set_var':1},
+            #                           'train_batches':2000
+            #                           })
+            #  ),
+             (MNIST_DATA_Config.copy({'reverse':True}),
+              backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
+                                   'backbone_config':{'virtual_bond_config':"models/arbitary_shape/arbitary_shape_2.json",'solved_std':4e-2},
+                                   'train_batches':3000
+                                   })
+            ),
         ]
 # dmlist=[(MNIST_DATA_Config,
 #              backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
