@@ -62,7 +62,8 @@ dmlist=[
             #  ),
              (MNIST_DATA_Config.copy({'reverse':True}),
               backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
-                                   'backbone_config':{'virtual_bond_config':"models/arbitary_shape/arbitary_shape_2.json",'solved_std':4e-2},
+                                   'backbone_alias':'PEPS_einsum_arbitrary_partition_optim_shape_3'
+                                   'backbone_config':{'virtual_bond_config':"models/arbitary_shape/arbitary_shape_3.json",'solved_std':4e-2},
                                    'train_batches':3000
                                    })
             ),
