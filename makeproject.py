@@ -16,19 +16,19 @@ trainbases= [Train_Base_Default.copy({"grad_clip":None,
                                      'do_extra_phase':False,
                                      'doearlystop':True,
                                      'doanormaldt':True})]
-hypertuner= [Normal_Train_Default]
-# hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not_prune':True,
-#                                        'optimizer_list':{
-#                                                 'Adam':{'lr':[0.0001,0.005],  'betas':[[0.5,0.9],0.999]},
-#                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
-#                                                 },
-#                                        #'drop_rate_range':[0.1,0.25],
-#                                        'grad_clip_list':[None],
-#                                                         })]
+#hypertuner= [Normal_Train_Default]
+hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not_prune':True,
+                                       'optimizer_list':{
+                                                'Adam':{'lr':[0.005,0.05],  'betas':[[0.5,0.9],0.999]},
+                                                #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
+                                                },
+                                       #'drop_rate_range':[0.1,0.25],
+                                       'grad_clip_list':[None],
+                                                        })]
 
 schedulers= [Scheduler_None]
-schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
-optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
+#schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
+optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
 earlystops= [Earlystop_NMM_Default.copy({"_TYPE_":"no_min_more","config":{"es_max_window":40}})]
 anormal_detect= [Anormal_D_DC_Default.copy({"_TYPE_":"decrease_counting",
                                       "config":{"stop_counting":30,
@@ -40,14 +40,14 @@ train_config_list = [ConfigCombine({"base":[b,h], "scheduler":[s], "earlystop":[
                         for o in optimizers for e in earlystops
                         for a in anormal_detect]
 
-MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.MNIST','dataset_args':{'root':DATAROOT+f"/MNIST",'download':True}})
+MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.FashionMNIST','dataset_args':{'root':DATAROOT+f"/FashionMNIST",'download':True}})
 dmlist=[
-           # (MNIST_DATA_Config,
-           #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
-           #                           'backbone_config':{'virtual_bond_dim':10,'init_std':0.3},
-           #                           'train_batches':100
-           #                           })
-           # ),
+           (MNIST_DATA_Config,
+            backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
+                                     'backbone_config':{'virtual_bond_dim':6,'init_std':1},
+                                     'train_batches':1000
+                                     })
+           ),
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
            #                           'backbone_config':{'W':6,'H':6,'virtual_bond_dim':6,'in_physics_bond':16,'init_std': 1e-5},
@@ -60,13 +60,13 @@ dmlist=[
             #                           'train_batches':2000
             #                           })
             #  ),
-             (MNIST_DATA_Config.copy({'reverse':True}),
-              backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
-                                   'backbone_alias':'PEPS_einsum_arbitrary_partition_optim_shape_3'
-                                   'backbone_config':{'virtual_bond_config':"models/arbitary_shape/arbitary_shape_3.json",'solved_std':4e-2},
-                                   'train_batches':3000
-                                   })
-            ),
+            #  (MNIST_DATA_Config.copy({'reverse':True}),
+            #   backbone_templete.copy({'backbone_TYPE':'PEPS_einsum_arbitrary_partition_optim',
+            #                        'backbone_alias':'PEPS_einsum_arbitrary_partition_optim_shape_3',
+            #                        'backbone_config':{'virtual_bond_config':"models/arbitary_shape/arbitary_shape_3.json",'solved_std':0.024},
+            #                        'train_batches':600
+            #                        })
+            # ),
         ]
 # dmlist=[(MNIST_DATA_Config,
 #              backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',

@@ -840,7 +840,8 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             ranks_list.append(ranks)
             sublist_list.append(sublist)
         operands+= [[...,*outlist]]
-        path,info = oe.contract_path(*operands,optimize='random-greedy-128')
+        path = self.get_best_contracting_path(*operands)
+        #path,info = oe.contract_path(*operands,optimize='random-greedy-128')
         self.path         = path
         self.sublist_list = sublist_list
         self.outlist      = outlist

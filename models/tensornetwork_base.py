@@ -144,6 +144,16 @@ class TN_Base(nn.Module):
         corn_input = batch_image_input[...,[0,0,-1,-1],[0,-1,0,-1],:]
         return bulk_input,edge_input,corn_input
 
+    def get_best_contracting_path(self,*operands):
+        array_string = full_size_array_string(*operands)
+        if array_string not in self.path_record:
+            self.path_record[array_string] = oe.contract_path(*operands,optimize='random-greedy')[0]
+            if hasattr(self,'path_record_file'):
+                with open(self.path_record_file,'w') as f:json.dump(self.path_record,f)
+        if 'path' in self.path_record[array_string]:
+            return self.path_record[array_string]['path']
+        else:
+            return self.path_record[array_string]
     def einsum_engine(self,*operands,optimize=None):
         #path_id,equation,*batch_input):
         if optimize is not None:
@@ -151,12 +161,8 @@ class TN_Base(nn.Module):
             # in __init__ phase. So build map at that time make sense
             return self.einsum(*operands,optimize=optimize)
         if not hasattr(self,'path_record'):self.path_record={}
-        array_string = full_size_array_string(*operands)
-        if array_string not in self.path_record:
-            self.path_record[array_string] = oe.contract_path(*operands,optimize='random-greedy')[0]
-            if hasattr(self,'path_record_file'):
-                with open(self.path_record_file,'w') as f:json.dump(self.path_record,f)
-        return self.einsum(*operands, optimize=self.path_record[array_string])
+        path = self.get_best_contracting_path(*operands)
+        return self.einsum(*operands, optimize=path)
 
     def load_from(self,path):
         checkpoint = torch.load(path)
