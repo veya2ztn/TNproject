@@ -13,7 +13,9 @@ They have slightly difference: For the `oe.contract`, it contract operation one 
 
 After several tests, they **have same performance**.
 
+![](https://github.com/veya2ztn/TNproject/blob/main/benchmark/ContractionEngine/figures/Memory_comparsion_between_complie_method_and_oe_method_for_different_batch.png)
 
+![](https://github.com/veya2ztn/TNproject/blob/main/benchmark/ContractionEngine/figures/Speed_comparsion_between_complie_method_and_oe_method_for_different_batch.png)
 
 But I will recommend you use the build-in function `oe.contract` because the custom PyTorch way has following backward:
 
