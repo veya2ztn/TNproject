@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# CopyRight:
 import random
 import itertools
 

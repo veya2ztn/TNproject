@@ -1,4 +1,5 @@
 import sys,os
+import numpy as np
 SCRIPT_DIR = os.path.realpath(os.path.dirname(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
