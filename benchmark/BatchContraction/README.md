@@ -7,7 +7,7 @@ We consider the scenarios that
 
 Our goal is to calculate the hundreds of inner product  $\lang W|B_i\rang$ as fast as possible.
 
-<img src="Batch TensorNetwork.assets/diagram1.png" alt="diagram1" style="zoom:50%;" />
+<img src="https://github.com/veya2ztn/TNproject/blob/main/benchmark/BatchContraction/figures/diagram1.png" alt="diagram1" style="zoom:50%;" />
 
 There are three way to make it:
 
@@ -19,7 +19,7 @@ There are three way to make it:
 
 For the `batch` version of TensorNetwork, please see our paper(coming soon). The conclusion is very simple, the `batch` is another `blockdiag` TensorNetwork with larger bond dimension.
 
-![image-20220124112616361](Batch TensorNetwork.assets/image-20220124112616361.png)
+![image-20220124112616361](https://github.com/veya2ztn/TNproject/blob/main/benchmark/BatchContraction/figures/benchmark.png)
 
 The `einsum` can hold `batch contraction` like `Babcd,Babcd->B` which is not a tensor contraction (so it cannot be replicated by `tensordot`). It is same as treat the `batch ` TensorNetwork as sparse matrix and contracting via sparse way.
 
