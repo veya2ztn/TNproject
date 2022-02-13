@@ -400,7 +400,7 @@ class PEPS_einsum_uniform_shape_6x6_one_contracting(PEPS_einsum_uniform_shape):
 class PEPS_uniform_shape_symmetry_base(TN_Base):
     def __init__(self, W=6,H=6,out_features=16,
                        in_physics_bond = 3, virtual_bond_dim=3,
-                       init_std=1e-10):
+                       init_std=1e-10,symmetry = None):
         super().__init__()
         assert (W == H)
         self.W             = W
@@ -413,48 +413,97 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
         self.P             = P = in_physics_bond
         self.LW = LW =  int(np.ceil(1.0*W/2))
         self.LH = LH = int(np.floor(1.0*H/2))
-        self.corn_tensors = nn.Parameter(self.rde2D( (4,O,P,D,D),init_std, offset=3))
-        self.edge_tensors = nn.Parameter(self.rde2D( (2*(W-2)+2*(H-2),P,D,D,D),init_std, offset=2))
-        self.bulk_tensors = nn.Parameter(self.rde2D( ((W-2)*(H-2),P,D,D,D,D),init_std, offset=2))
 
-        self.index_matrix = index_matrix = torch.LongTensor([[[i,j] for j in range(W)] for i in range(H)])
+
+        index_matrix = torch.LongTensor([[[i,j] for j in range(W)] for i in range(H)])
         bulk_index,edge_index,corn_index=self.flatten_image_input(index_matrix)
+        flag_matrix     = torch.zeros(W,H).long()
+        position_matrix = torch.zeros(W,H).long()
+        symmetry_map    = self.generate_symmetry_map(W,H,symmetry=symmetry)
+        tensor_needed   = []
+        active_index    = []
+        for flag, types in enumerate([corn_index,edge_index,bulk_index]):
+            res= 0
+            tensor_order_for_this_type=[]
+            for (i,j) in types.numpy():
+                flag_matrix[i,j]=flag
+                now_pos = (i,j)
+                while (now_pos in symmetry_map) and (isinstance(symmetry_map[now_pos],tuple )):
+                    now_pos = symmetry_map[now_pos]
+                if now_pos not in symmetry_map:
+                    symmetry_map[now_pos] = res
+                    res += 1
+                position_matrix[i,j]= symmetry_map[now_pos]
+                tensor_order_for_this_type.append(position_matrix[i,j])
+            active_index.append(tensor_order_for_this_type)
+            tensor_needed.append(res)
+        assert W*H == len(symmetry_map)
+        # flag_matrix record the tensor type information: is corner(a,b) or edge(a,b,c) or bulk(a,b,c,d)
+        # position_matrix record a position index for (i,j) should be where in the select rule self.flatten_image_input
+        #    this rule is also the order in this weight.
+        #    for example, the (x,y) = [0,-1] is the second tensor in corn and should be the second tensor after
+        #    contract self.corn_tensors and corn_input
+        #    the symmetry map indicate the symmetry group:
+        #        if "R4" symmetry, then corn [0,0] [0,-1] [-1,-1] [-1,0] will share same active kernel
+        #        so there only end tensor_needed[0] = 1 corn-weight
+        self.active_index = active_index
+        self.corn_tensors = nn.Parameter(self.rde2D( ([tensor_needed[0]],O,P,D,D)  ,init_std, offset=3))
+        self.edge_tensors = nn.Parameter(self.rde2D( ([tensor_needed[1]],P,D,D,D)  ,init_std, offset=2))
+        self.bulk_tensors = nn.Parameter(self.rde2D( ([tensor_needed[2]],P,D,D,D,D),init_std, offset=2))
+
         part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).transpose(1,0)
         part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH].flatten(0,1).transpose(1,0)
         part_rd_idex = torch.rot90(index_matrix,k=2)[:LW,:LH].flatten(0,1).transpose(1,0)
         part_ld_idex = torch.rot90(index_matrix,k=3)[:LW,:LH].flatten(0,1).transpose(1,0)
-
-        flag_matrix = torch.zeros(W,H).long()
-        position_matrix = torch.zeros(W,H).long()
-
-        for n,(i,j) in enumerate(corn_index.numpy()):
-            flag_matrix[i,j]=0
-            position_matrix[i,j]=n
-        for n,(i,j) in enumerate(edge_index.numpy()):
-            flag_matrix[i,j]=1
-            position_matrix[i,j]=n
-        for n,(i,j) in enumerate(bulk_index.numpy()):
-            flag_matrix[i,j]=2
-            position_matrix[i,j]=n
-
         self.indexrule = torch.stack([
                                position_matrix[part_lu_idex[0],part_lu_idex[1]],
                                position_matrix[part_ru_idex[0],part_ru_idex[1]],
                                position_matrix[part_rd_idex[0],part_rd_idex[1]],
                                position_matrix[part_ld_idex[0],part_ld_idex[1]],
                                ]).transpose(1,0)
-
         self.partrule        = flag_matrix[part_lu_idex[0],part_lu_idex[1]]
+        # self.indexrule maintain the contraction engine (sublist)
+        # for each tensor should be located in where.
+        # in this module, the first 1/4 part is the left-upper corner. the next is its 90 degree rotation, then 180 then 270.
+
+        # in real contraction, we first get the sublist of the tensors' position (i,j),
+        # then use partrule and position_matrix get the tensor from the map position_matrix[i,j] = index, partrule[i,j] = 0,1,2
         self.flag_matrix     = flag_matrix
         self.position_matrix = position_matrix
         self.cent_tensor_idx = position_matrix[self.W//2,self.H//2] if self.W%2==1 else None
 
     def get_batch_contraction_network(self,input_data):
-        bulk_input,edge_input,corn_input = self.flatten_image_input(input_data)
-        bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
-        edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
-        corn_tensors = self.einsum_engine(" lopab,klp->lkoab" ,self.corn_tensors,corn_input)
+        bulk_inputs,edge_inputs,corn_inputs = self.flatten_image_input(input_data)
+        # the input data would divide in same rule as flatten_image_input: NxN -> corn/edge/bulk input list
+        corn_tensors = self.einsum_engine(" lopab,klp->lkoab" ,self.corn_tensors[[self.active_index[0]]],corn_input)
+        edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors[[self.active_index[1]]],edge_input)
+        bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors[[self.active_index[2]]],bulk_input)
         return bulk_tensors,edge_tensors,corn_tensors
+
+    def generate_symmetry_map(self,W,H,symmetry='R4'):
+        assert W%2 == 0 and W == H
+        LW =  int(np.ceil(1.0*W/2))
+        LH = int(np.floor(1.0*H/2))
+        index_matrix = torch.LongTensor([[[i,j] for j in range(W)] for i in range(H)])
+        if symmetry == 'R4':
+            part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).numpy()
+            part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH].flatten(0,1).numpy()
+            part_rd_idex = torch.rot90(index_matrix,k=2)[:LW,:LH].flatten(0,1).numpy()
+            part_ld_idex = torch.rot90(index_matrix,k=3)[:LW,:LH].flatten(0,1).numpy()
+            symmetry_map = {}
+            for n,(a,b,c) in enumerate(zip(part_ru_idex,part_rd_idex,part_ld_idex)):
+                i = part_lu_idex[n][0]
+                j = part_lu_idex[n][1]
+                symmetry_map[a[0],a[1]] = (i,j)
+                symmetry_map[b[0],b[1]] = (i,j)
+                symmetry_map[c[0],c[1]] = (i,j)
+            return symmetry_map
+        elif symmetry == 'R4Z2':
+            symmetry_map = self.generate_symmetry_map(W,H,symmetry='R4')
+            part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).numpy()
+            for i,j in part_lu_idex:
+                if (j,i) not in symmetry_map and j>i:symmetry_map[j,i] =(i,j)
+            return symmetry_map
 
     def weight_init(self,method=None,set_var=1):
         if method is None:return
@@ -480,7 +529,7 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
             if   part == 0:tensor_list.append(corn_tensors[idxes])
             elif part == 1:tensor_list.append(edge_tensors[idxes])
             elif part == 2:tensor_list.append(bulk_tensors[idxes])
-            else:raise NotImplementedError
+            else:raise NotImplezntedError
         return tensor_list
 
 # class PEPS_uniform_shape_symmetry_any_old(PEPS_uniform_shape_symmetry_base):
@@ -719,6 +768,71 @@ class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
         corn   = corn/D**(LW/3)# basicly should use LW/4 but use LW/3 to avoid gradient vanish
         corn   = self.einsum_engine("kvab,kxbc,kycd,kzda->kvxyz",*corn).flatten(-4,-1)# -> (B,O^4)
         return corn
+
+class PEPS_uniform_shape_rotation90_even(TN_Base):
+    def __init__(self, W=6,H=6,out_features=16,
+                       in_physics_bond = 3, virtual_bond_dim=3,
+                       init_std=1e-10):
+        super().__init__()
+        assert (W == H)
+        assert (W%2 == 0)
+        self.W             = W
+        self.H             = H
+        self.out_features  = out_features
+        O                  = np.power(out_features,1/4)
+        assert np.ceil(O) == np.floor(O)
+        self.O             = O = O.astype('uint')
+        self.D             = D = virtual_bond_dim
+        self.P             = P = in_physics_bond
+        self.LW = LW =  int(np.ceil(1.0*W/2))
+        self.LH = LH = int(np.floor(1.0*H/2))
+
+
+        self.index_matrix = index_matrix = torch.LongTensor([[[i,j] for j in range(W)] for i in range(H)])
+        bulk_index,edge_index,corn_index=self.flatten_image_input(index_matrix)
+        flag_matrix     = torch.zeros(W,H).long()
+        position_matrix = torch.zeros(W,H).long()
+        symmetry_map    = self.generate_symmetry_map(W,H,symmetry='R4')
+        tensor_needed   = []
+        active_index    = []
+        for flag, types in enumerate([corn_index,edge_index,bulk_index]):
+            res= 0
+            tensor_order_for_this_type=[]
+            for (i,j) in types.numpy():
+                flag_matrix[i,j]=flag
+                now_pos = (i,j)
+                while (now_pos in symmetry_map) and (isinstance(symmetry_map[now_pos],tuple )):
+                    now_pos = symmetry_map[now_pos]
+                if now_pos not in symmetry_map:
+                    symmetry_map[now_pos] = res
+                    res += 1
+                position_matrix[i,j]= symmetry_map[now_pos]
+                tensor_order_for_this_type.append(position_matrix[i,j])
+            active_index.append(tensor_order_for_this_type)
+            tensor_needed.append(res)
+        assert W*H == len(symmetry_map)
+
+        self.corn_tensors = nn.Parameter(self.rde2D( ([tensor_needed[0]],O,P,D,D)  ,init_std, offset=3))
+        self.edge_tensors = nn.Parameter(self.rde2D( ([tensor_needed[1]],P,D,D,D)  ,init_std, offset=2))
+        self.bulk_tensors = nn.Parameter(self.rde2D( ([tensor_needed[2]],P,D,D,D,D),init_std, offset=2))
+
+        self.active_index = active_index
+        part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).transpose(1,0)
+        part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH].flatten(0,1).transpose(1,0)
+        part_rd_idex = torch.rot90(index_matrix,k=2)[:LW,:LH].flatten(0,1).transpose(1,0)
+        part_ld_idex = torch.rot90(index_matrix,k=3)[:LW,:LH].flatten(0,1).transpose(1,0)
+        self.indexrule = torch.stack([
+                               position_matrix[part_lu_idex[0],part_lu_idex[1]],
+                               position_matrix[part_ru_idex[0],part_ru_idex[1]],
+                               position_matrix[part_rd_idex[0],part_rd_idex[1]],
+                               position_matrix[part_ld_idex[0],part_ld_idex[1]],
+                               ]).transpose(1,0)
+        self.partrule        = flag_matrix[part_lu_idex[0],part_lu_idex[1]]
+        self.flag_matrix     = flag_matrix
+        self.position_matrix = position_matrix
+        self.real_pos_for_id = real_pos_for_id
+        self.cent_tensor_idx = position_matrix[self.W//2,self.H//2] if self.W%2==1 else None
+
 
 class PEPS_einsum_arbitrary_shape_optim(TN_Base):
     def __init__(self, W, H ,out_features=10,
