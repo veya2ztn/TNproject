@@ -16,7 +16,7 @@ from mltool import optim as optim
 
 from torchvision import datasets, transforms
 
-from models import NanValueError
+#from models import NanValueError
 import models as mdl
 
 MEMORYLIMIT = 0.9

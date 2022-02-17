@@ -447,9 +447,10 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
         #        if "R4" symmetry, then corn [0,0] [0,-1] [-1,-1] [-1,0] will share same active kernel
         #        so there only end tensor_needed[0] = 1 corn-weight
         self.active_index = active_index
-        self.corn_tensors = nn.Parameter(self.rde2D( ([tensor_needed[0]],O,P,D,D)  ,init_std, offset=3))
-        self.edge_tensors = nn.Parameter(self.rde2D( ([tensor_needed[1]],P,D,D,D)  ,init_std, offset=2))
-        self.bulk_tensors = nn.Parameter(self.rde2D( ([tensor_needed[2]],P,D,D,D,D),init_std, offset=2))
+
+        self.corn_tensors = nn.Parameter(self.rde2D( (tensor_needed[0],O,P,D,D)  ,init_std, offset=3))
+        self.edge_tensors = nn.Parameter(self.rde2D( (tensor_needed[1],P,D,D,D)  ,init_std, offset=2))
+        self.bulk_tensors = nn.Parameter(self.rde2D( (tensor_needed[2],P,D,D,D,D),init_std, offset=2))
 
         part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).transpose(1,0)
         part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH].flatten(0,1).transpose(1,0)
@@ -475,17 +476,17 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
     def get_batch_contraction_network(self,input_data):
         bulk_inputs,edge_inputs,corn_inputs = self.flatten_image_input(input_data)
         # the input data would divide in same rule as flatten_image_input: NxN -> corn/edge/bulk input list
-        corn_tensors = self.einsum_engine(" lopab,klp->lkoab" ,self.corn_tensors[[self.active_index[0]]],corn_input)
-        edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors[[self.active_index[1]]],edge_input)
-        bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors[[self.active_index[2]]],bulk_input)
+        corn_tensors = self.einsum_engine(" lopab,klp->lkoab" ,self.corn_tensors[[self.active_index[0]]],corn_inputs)
+        edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors[[self.active_index[1]]],edge_inputs)
+        bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors[[self.active_index[2]]],bulk_inputs)
         return bulk_tensors,edge_tensors,corn_tensors
 
-    def generate_symmetry_map(self,W,H,symmetry='R4'):
-        assert W%2 == 0 and W == H
+    def generate_symmetry_map(self,W,H,symmetry=None):
+        if symmetry is None:return {}
         LW =  int(np.ceil(1.0*W/2))
         LH = int(np.floor(1.0*H/2))
         index_matrix = torch.LongTensor([[[i,j] for j in range(W)] for i in range(H)])
-        if symmetry == 'R4':
+        if symmetry == 'P4':
             part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).numpy()
             part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH].flatten(0,1).numpy()
             part_rd_idex = torch.rot90(index_matrix,k=2)[:LW,:LH].flatten(0,1).numpy()
@@ -498,12 +499,15 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
                 symmetry_map[b[0],b[1]] = (i,j)
                 symmetry_map[c[0],c[1]] = (i,j)
             return symmetry_map
-        elif symmetry == 'R4Z2':
-            symmetry_map = self.generate_symmetry_map(W,H,symmetry='R4')
+        elif symmetry == 'P4Z2':
+            symmetry_map = self.generate_symmetry_map(W,H,symmetry='P4')
             part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).numpy()
             for i,j in part_lu_idex:
                 if (j,i) not in symmetry_map and j>i:symmetry_map[j,i] =(i,j)
+
             return symmetry_map
+        else:
+            raise NotImplementedError
 
     def weight_init(self,method=None,set_var=1):
         if method is None:return
@@ -769,7 +773,7 @@ class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
         corn   = self.einsum_engine("kvab,kxbc,kycd,kzda->kvxyz",*corn).flatten(-4,-1)# -> (B,O^4)
         return corn
 
-class PEPS_uniform_shape_rotation90_even(TN_Base):
+class PEPS_uniform_shape_rotation90(TN_Base):
     def __init__(self, W=6,H=6,out_features=16,
                        in_physics_bond = 3, virtual_bond_dim=3,
                        init_std=1e-10):

@@ -7,7 +7,7 @@ import numpy as np
 import os
 import json
 from .model_utils import full_size_array_string
-path_recorder  = "models/arbitrary_shape_path_recorder.json"
+path_recorder  = "./arbitrary_shape_path_recorder.json"
 class TN_Base(nn.Module):
     def __init__(self,einsum_engine=torch.einsum,path_record=path_recorder):
         super().__init__()
@@ -17,8 +17,11 @@ class TN_Base(nn.Module):
             self.einsum = oe.contract
         if path_record is not None:
             if isinstance(path_record,str):
-                with open(path_record,'r') as f:
-                    self.path_record = json.load(f)
+                if os.path.exists(path_record):
+                    with open(path_record,'r') as f:
+                        self.path_record = json.load(f)
+                else:
+                    self.path_record  = {}
                 self.path_record_file = path_record
             else:
                 self.path_record = path_record
