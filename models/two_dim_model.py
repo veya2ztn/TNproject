@@ -400,7 +400,7 @@ class PEPS_einsum_uniform_shape_6x6_one_contracting(PEPS_einsum_uniform_shape):
 class PEPS_uniform_shape_symmetry_base(TN_Base):
     def __init__(self, W=6,H=6,out_features=16,
                        in_physics_bond = 3, virtual_bond_dim=3,
-                       init_std=1e-10,symmetry = None):
+                       init_std=1e-10,symmetry = None,init_method=None,init_set_var=1,**kargs):
         super().__init__()
         assert (W == H)
         self.W             = W
@@ -451,7 +451,7 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
         self.corn_tensors = nn.Parameter(self.rde2D( (tensor_needed[0],O,P,D,D)  ,init_std, offset=3))
         self.edge_tensors = nn.Parameter(self.rde2D( (tensor_needed[1],P,D,D,D)  ,init_std, offset=2))
         self.bulk_tensors = nn.Parameter(self.rde2D( (tensor_needed[2],P,D,D,D,D),init_std, offset=2))
-
+        self.weight_init(method = init_method,set_var=init_set_var)
         part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).transpose(1,0)
         part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH].flatten(0,1).transpose(1,0)
         part_rd_idex = torch.rot90(index_matrix,k=2)[:LW,:LH].flatten(0,1).transpose(1,0)
