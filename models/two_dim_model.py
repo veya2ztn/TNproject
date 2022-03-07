@@ -35,13 +35,9 @@ class PEPS_einsum_uniform_shape(TN_Base):
             return  edge_tensors[W-4+2*i],bulk_tensors[(W-2)*(i-1):(W-2)*i],edge_tensors[W-4+2*i+1]
 
     def get_batch_contraction_network(self,input_data):
-        input_data = input_data.flatten(1,2)
-        bulk_input = batch_image_input[...,bulk_idxes,:]
-        edge_input = batch_image_input[...,edge_idxes,:]
-        corn_input = batch_image_input[...,corn_idxes,:]
-
-        cent_input   = corn_input[:, -1]
-        corn_input   = corn_input[:,:-1]
+        bulk_input,edge_input,corn_input = self.flatten_image_input(input_data)
+        cent_input   = corn_input[..., -1,:]
+        corn_input   = corn_input[...,:-1,:]
         bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
         edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
         corn_tensors = self.einsum_engine("  lpab,klp->lkab"  ,self.corn_tensors,corn_input)
@@ -152,10 +148,10 @@ class PEPS_einsum_uniform_shape_6x6_fast(PEPS_einsum_uniform_shape):
         assert W==6
         assert H==6
         super().__init__(6,6,out_features,**kargs)
-    def forward(self,input_data):
 
+    def forward(self,input_data):
         bulk_tensors,edge_tensors,corn_tensors,cent_tensors = self.get_batch_contraction_network(input_data)
-        #corner_contraction
+
         W=H=6;
         L=4              ;corn_index = [0,1,2,3]
         L=2*(W-2)+2*(H-2);edge_index1=[0,(W-2)+1,W-2+2*(H-3),L-1] # [0,5,10,15] for 6x6
@@ -396,7 +392,6 @@ class PEPS_einsum_uniform_shape_6x6_one_contracting(PEPS_einsum_uniform_shape):
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
 
-
 class PEPS_uniform_shape_symmetry_base(TN_Base):
     def __init__(self, W=6,H=6,out_features=16,
                        in_physics_bond = 3, virtual_bond_dim=3,
@@ -536,71 +531,6 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
             else:raise NotImplezntedError
         return tensor_list
 
-# class PEPS_uniform_shape_symmetry_any_old(PEPS_uniform_shape_symmetry_base):
-#     def __init__(self, **kargs):
-#         super().__init__(**kargs)
-#         W = self.W;
-#         H = self.H
-#         O = self.O
-#         P = self.P
-#         D = self.D
-#         self.LW = LW = W//2
-#         self.LH = LH = H//2
-#         tn2D_shape_list                = [ [(D,D,O)]+[  (D,D,D)]*(LH-1) ]+ \
-#                                          [ [(D,D,D)]+[(D,D,D,D)]*(LH-1)]*(LW-1)
-#         path,sublist_list,outlist = get_best_path(tn2D_shape_list,store=path_recorder,type='sub')
-#         #node_list,sublist_list,outlist = sub_network_tn(tn2D_shape_list)
-#         #path,info                      = get_optim_path_by_oe_from_tn(node_list)
-#         last_idx = outlist.pop()
-#         outlist.insert(LH,last_idx)
-#         #print(outlist)
-#         #outlist should be [2, 6, 12, 18, 13, 15, 17] for 3x3
-#         self.sublist_list = sublist_list
-#         self.outlist      = outlist
-#         self.path         = path
-#
-#         self.path_record  = {}
-#         self.path_final= None
-#     def forward(self,input_data):
-#         bulk_input,edge_input,corn_input,cent_input = self.flatten_image_input(input_data)
-#         corn_input   = torch.cat([corn_input,cent_input.unsqueeze(1)],1)
-#         bulk_tensors = self.einsum_engine("lpabcd,klp->lkabcd",self.bulk_tensors,bulk_input)
-#         edge_tensors = self.einsum_engine(" lpabc,klp->lkabc" ,self.edge_tensors,edge_input)
-#         corn_tensors = self.einsum_engine("  lopab,klp->lkabo" ,self.corn_tensors,corn_input)
-#         L = len(bulk_tensors)
-#         remain = bulk_tensors.shape[1:]
-#         bulk_tensors = bulk_tensors.reshape(4,L//4,*remain)
-#
-#         L = len(edge_tensors)
-#         remain = edge_tensors.shape[1:]
-#         edge_tensors = edge_tensors.reshape(4,L//4,*remain)
-#
-#         LH = self.LH
-#         LW = self.LW
-#         tensor_list  =[[corn_tensors]        + list(edge_tensors[:LH-1]) ]+\
-#                       [[edge_tensors[LH-1+i]]+ list(bulk_tensors[(LH-1)*i:(LH-1)*(i+1)])
-#                                                                     for i in range(LW-1)]
-#         tensor_list     = [l for t in tensor_list for l in t]
-#         assert len(tensor_list)==len(self.sublist_list)
-#         operands=[]
-#         for tensor,sublist in zip(tensor_list,self.sublist_list):
-#             operand = [tensor,[...,*sublist]]
-#             operands+=operand
-#         operands+= [[...,*(self.outlist)]]
-#
-#         # in this case W==H , LW==LH
-#
-#         quater_contraction = self.einsum_engine(*operands,optimize=self.path).flatten(-2*LW,-LW-1).flatten(-LW,-1)
-#
-#         tensor  = self.einsum_engine("lkmab,lknbc->lkmnac",
-#                               quater_contraction[[0,2]],quater_contraction[[1,3]]
-#                               ).flatten(-4,-3)# -> (2,B,O^2,D^3,D^3)
-#         tensor  = self.einsum_engine("kmab,knba->kmn",
-#                               tensor[0],tensor[1]
-#                               ).flatten(-2,-1)# -> (B,O^4)
-#         return tensor
-
-
 class PEPS_uniform_shape_symmetry_6x6(PEPS_uniform_shape_symmetry_base):
     '''
     same performance as PEPS_uniform_shape_symmetry_any(W=6,H=6    )
@@ -684,160 +614,6 @@ class PEPS_uniform_shape_symmetry_any(PEPS_uniform_shape_symmetry_base):
                                   ).flatten(-4,-1)# -> (B,O^4)
         return tensor
 
-class PEPS_uniform_shape_symmetry_deep_model(PEPS_uniform_shape_symmetry_base):
-    def __init__(self, nonlinear_layer=nn.Tanh(),
-                       normlized_layer_module=nn.InstanceNorm3d,
-                       init_std=1e-10,normlized=True, set_var=1,**kargs):
-        super().__init__(**kargs)
-        H = self.H
-        W = self.W
-        LW= self.LW
-        LH= self.LH
-        D = self.D
-        O = self.O
-        P = self.P
-        if normlized:
-            self.weight_init(method="Expecatation_Normalization",set_var=set_var)
-
-        flag_matrix     = self.flag_matrix
-        position_matrix = self.position_matrix
-        index_matrix    = self.index_matrix
-        part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH]
-        part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH]
-        part_rd_idex = torch.rot90(index_matrix,k=2)[:LW,:LH]
-        part_ld_idex = torch.rot90(index_matrix,k=3)[:LW,:LH]
-        part_idex = torch.stack([part_lu_idex,
-                                 part_ru_idex,
-                                 part_rd_idex,
-                                 part_ld_idex],-2)
-
-        indexrules = []
-        partrules  = []
-        point_x = [0,0,1,1]
-        point_y = [0,1,1,0]
-        p       = part_idex[point_x,point_y]#(L,4,2)
-        indexrule=position_matrix[p[...,0],p[...,1]]
-        partrule =flag_matrix[p[...,0],p[...,1]][:,0]
-
-        indexrules.append(indexrule)
-        partrules.append(partrule)
-        edge_contraction_path=[]
-        for L in range(2,LW):
-            indexrule={}
-            partrule={}
-            tn2D_shape_list = [[(D,D,D)]+[(D,D,D,D)]*(L-1)]
-            path,sublist_list,outlist = get_best_path(tn2D_shape_list,store=path_recorder,type='sub')
-            edge_contraction_path.append([path,sublist_list,outlist])
-            point_x = [[j for j in range(L)],[L for j in range(L)]]
-            point_y = [[L for j in range(L)],[j for j in range(L)]]
-            p       = part_idex[point_x,point_y]#(2,L,4,2)
-            indexrule['edge']= position_matrix[p[...,0],p[...,1]].transpose(0,1)
-            partrule['edge'] = flag_matrix[p[...,0],p[...,1]][0][:,0]
-
-            point_x = [L]
-            point_y = [L]
-            p       = part_idex[point_x,point_y]#(L,4,2)
-
-            indexrule['cent']= position_matrix[p[...,0],p[...,1]]
-            partrule['cent'] = flag_matrix[p[...,0],p[...,1]][:,0]
-
-            indexrules.append(indexrule)
-            partrules.append(partrule)
-        self.indexrules = indexrules
-        self.partrules  = partrules
-        self.edge_contraction_path = edge_contraction_path
-        self.nonlinear_layer = nonlinear_layer
-        self.normlized_layers = nn.ModuleList([normlized_layer_module(O,affine=True) for _ in self.partrules])
-
-    def forward(self,input_data):
-        LH = self.LH
-        LW = self.LW
-        D  = self.D
-        bulk_tensors,edge_tensors,corn_tensors = self.get_batch_contraction_network(input_data)
-        corn_tensors = self.pick_tensors(self.partrules[0],self.indexrules[0],corn_tensors,edge_tensors,bulk_tensors)
-        corn = self.einsum_engine("lkoab,lkcdb,lkefcg,lkgah->lkohedf",*corn_tensors).flatten(-4,-3).flatten(-2,-1)
-        corn = self.nonlinear_layer(corn)# (4,B,O,D,D)
-        corn = self.normlized_layers[0](corn.permute(1,2,0,3,4)).permute(2,0,1,3,4)
-        for i,(partrule, indexrule) in enumerate(zip(self.partrules[1:],self.indexrules[1:])):
-            path,sublist_list,outlist = self.edge_contraction_path[i]
-            edge_tensors= self.pick_tensors(partrule['edge'],indexrule['edge'],corn_tensors,edge_tensors,bulk_tensors)
-            cent_tensor = self.pick_tensors(partrule['cent'],indexrule['cent'],corn_tensors,edge_tensors,bulk_tensors)[0]
-            L           = len(edge_tensors)
-            operands    = structure_operands(edge_tensors,sublist_list,outlist)
-            edge1,edge2 = self.einsum_engine(*operands,optimize=path).flatten(-L-L,-L-1).flatten(-L,-1)
-            corn = self.einsum_engine("lkoab,lkcdb,lkefcg,lkgah->lkohedf",corn ,edge1,cent_tensor,edge2).flatten(-4,-3).flatten(-2,-1)
-            corn = self.nonlinear_layer(corn)
-            corn = self.normlized_layers[i+1](corn.permute(1,2,0,3,4)).permute(2,0,1,3,4)
-        # corn now is a tensor (B,4,D^(L/2),D^(L/2))
-        corn   = corn/D**(LW/3)# basicly should use LW/4 but use LW/3 to avoid gradient vanish
-        corn   = self.einsum_engine("kvab,kxbc,kycd,kzda->kvxyz",*corn).flatten(-4,-1)# -> (B,O^4)
-        return corn
-
-class PEPS_uniform_shape_rotation90(TN_Base):
-    def __init__(self, W=6,H=6,out_features=16,
-                       in_physics_bond = 3, virtual_bond_dim=3,
-                       init_std=1e-10):
-        super().__init__()
-        assert (W == H)
-        assert (W%2 == 0)
-        self.W             = W
-        self.H             = H
-        self.out_features  = out_features
-        O                  = np.power(out_features,1/4)
-        assert np.ceil(O) == np.floor(O)
-        self.O             = O = O.astype('uint')
-        self.D             = D = virtual_bond_dim
-        self.P             = P = in_physics_bond
-        self.LW = LW =  int(np.ceil(1.0*W/2))
-        self.LH = LH = int(np.floor(1.0*H/2))
-
-
-        self.index_matrix = index_matrix = torch.LongTensor([[[i,j] for j in range(W)] for i in range(H)])
-        bulk_index,edge_index,corn_index=self.flatten_image_input(index_matrix)
-        flag_matrix     = torch.zeros(W,H).long()
-        position_matrix = torch.zeros(W,H).long()
-        symmetry_map    = self.generate_symmetry_map(W,H,symmetry='R4')
-        tensor_needed   = []
-        active_index    = []
-        for flag, types in enumerate([corn_index,edge_index,bulk_index]):
-            res= 0
-            tensor_order_for_this_type=[]
-            for (i,j) in types.numpy():
-                flag_matrix[i,j]=flag
-                now_pos = (i,j)
-                while (now_pos in symmetry_map) and (isinstance(symmetry_map[now_pos],tuple )):
-                    now_pos = symmetry_map[now_pos]
-                if now_pos not in symmetry_map:
-                    symmetry_map[now_pos] = res
-                    res += 1
-                position_matrix[i,j]= symmetry_map[now_pos]
-                tensor_order_for_this_type.append(position_matrix[i,j])
-            active_index.append(tensor_order_for_this_type)
-            tensor_needed.append(res)
-        assert W*H == len(symmetry_map)
-
-        self.corn_tensors = nn.Parameter(self.rde2D( ([tensor_needed[0]],O,P,D,D)  ,init_std, offset=3))
-        self.edge_tensors = nn.Parameter(self.rde2D( ([tensor_needed[1]],P,D,D,D)  ,init_std, offset=2))
-        self.bulk_tensors = nn.Parameter(self.rde2D( ([tensor_needed[2]],P,D,D,D,D),init_std, offset=2))
-
-        self.active_index = active_index
-        part_lu_idex = torch.rot90(index_matrix,k=0)[:LW,:LH].flatten(0,1).transpose(1,0)
-        part_ru_idex = torch.rot90(index_matrix,k=1)[:LW,:LH].flatten(0,1).transpose(1,0)
-        part_rd_idex = torch.rot90(index_matrix,k=2)[:LW,:LH].flatten(0,1).transpose(1,0)
-        part_ld_idex = torch.rot90(index_matrix,k=3)[:LW,:LH].flatten(0,1).transpose(1,0)
-        self.indexrule = torch.stack([
-                               position_matrix[part_lu_idex[0],part_lu_idex[1]],
-                               position_matrix[part_ru_idex[0],part_ru_idex[1]],
-                               position_matrix[part_rd_idex[0],part_rd_idex[1]],
-                               position_matrix[part_ld_idex[0],part_ld_idex[1]],
-                               ]).transpose(1,0)
-        self.partrule        = flag_matrix[part_lu_idex[0],part_lu_idex[1]]
-        self.flag_matrix     = flag_matrix
-        self.position_matrix = position_matrix
-        self.real_pos_for_id = real_pos_for_id
-        self.cent_tensor_idx = position_matrix[self.W//2,self.H//2] if self.W%2==1 else None
-
-
 class PEPS_einsum_arbitrary_shape_optim(TN_Base):
     def __init__(self, W, H ,out_features=10,
                        in_physics_bond = 2, virtual_bond_dim=2,
@@ -900,12 +676,13 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         return self.einsum_engine(*operands,optimize=self.path)
 
 class PEPS_einsum_arbitrary_partition_optim(TN_Base):
-    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_config="models/arbitary_shape/arbitary_shape_1.json",
+    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_dim=None,virtual_bond_config="models/arbitary_shape/arbitary_shape_1.json",
                        bias=True,label_position='center',contraction_mode = 'recursion',
                  init_std=1e-10,
                  seted_variation=10,
                  solved_std=None):
         super().__init__()
+        if virtual_bond_dim is not None:virtual_bond_config = virtual_bond_dim
         if isinstance(virtual_bond_config,str):
             arbitary_shape_state_dict = torch.load(virtual_bond_config)
         else:

@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from .two_dim_model import *
-
+from .two_dim_model_backup import *
 class Patch2NetworkInput(nn.Module):
     def __init__(self,divide,reverse=True):
         super().__init__()
@@ -41,7 +41,7 @@ class LinearCombineModel1(nn.Module):
         x = self.classifier(x)  #(B,10)
         return x
 class CNNCombineModel(nn.Module):
-    def __init__(self,out_features=10,divide=4,inp_channel=1,mid_channel=8,out_channel=16,**kargs):
+    def __init__(self,out_features=10,divide=4,inp_channel=1,mid_channel=8,out_channel=16,version=1,**kargs):
         super().__init__()
         self.feature_layer= nn.Sequential(
               nn.Conv2d(inp_channel, mid_channel, kernel_size=3, bias=False),
@@ -51,7 +51,11 @@ class CNNCombineModel(nn.Module):
               nn.BatchNorm2d(out_channel),
               nn.ReLU(inplace=True))
         self.data_align   = Patch2NetworkInput(divide)
-        self.network_layer= PEPS_uniform_shape_symmetry_any(W=24//divide,H=24//divide,in_physics_bond=out_channel*divide*divide,out_features=16,**kargs)
+        if version == 1:
+            self.network_layer= PEPS_uniform_shape_symmetry_any_old(W=24//divide,H=24//divide,in_physics_bond=out_channel*divide*divide,out_features=16,**kargs)
+        elif version == 2:
+            self.network_layer= PEPS_uniform_shape_symmetry_any(W=24//divide,H=24//divide,in_physics_bond=out_channel*divide*divide,out_features=16,**kargs)
+
         self.classifier   = nn.Linear(16,out_features)
 
     def load_from(self,path):
@@ -73,12 +77,35 @@ class CNNCombineModel(nn.Module):
         return x
 class LinearCombineModel2(CNNCombineModel):
     def __init__(self,**kargs):
-        super().__init__(inp_channel=1,mid_channel=8,out_channel=16,**kargs)
+        super().__init__(inp_channel=1,mid_channel=8,out_channel=16,version=1,**kargs)
 class LinearCombineModel3(CNNCombineModel):
     def __init__(self,**kargs):
-        super().__init__(inp_channel=1,mid_channel=32,out_channel=64,**kargs)
+        super().__init__(inp_channel=1,mid_channel=32,out_channel=64,version=1,**kargs)
+
 class TensorNetworkDeepModel1(nn.Module):
     def __init__(self,out_features=10,divide=4,inp_channel=1,mid_channel=8,out_channel=16,**kargs):
         super().__init__()
         self.data_align   = Patch2NetworkInput(divide,reverse=False)
-       
+        self.network_layer= PEPS_uniform_shape_symmetry_deep_model_old(W=24//divide,H=24//divide,
+                            in_physics_bond=divide*divide,out_features=16,
+                            normlized_layer_module=nn.InstanceNorm3d,
+                            nonlinear_layer=nn.Tanh(),
+                            **kargs)
+        self.classifier   = nn.Linear(16,out_features)
+
+    def forward(self,x):
+        x = self.data_align(x)
+        x = self.network_layer(x) #(B,16)
+        x = self.classifier(x)  #(B,10)
+        return x
+
+class ArbitaryPartitionModel1(nn.Module):
+    def __init__(self,out_features=10,divide=4,inp_channel=1,mid_channel=8,out_channel=16,**kargs):
+        super().__init__()
+        self.network_layer= PEPS_einsum_arbitrary_partition_optim(W=24//divide,H=24//divide,
+                            in_physics_bond=16,out_features=16,
+                            **kargs)
+
+    def forward(self,x):
+        x = self.network_layer(x) #(B,16)
+        return x

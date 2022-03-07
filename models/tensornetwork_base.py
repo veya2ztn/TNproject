@@ -179,3 +179,5 @@ class TN_Base(nn.Module):
 
     def weight_init(self):
         raise NotImplementedError
+
+    

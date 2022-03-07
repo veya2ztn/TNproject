@@ -6,7 +6,7 @@ import os,json
 from tensornetwork.network_components import get_all_nondangling,get_all_dangling
 from tensornetwork.contractors.opt_einsum_paths.utils import get_subgraph_dangling,get_all_edges
 
-def get_sublist_from_node_list(node_list):
+def get_sublist_from_node_list(node_list,outlist = None):
     for edge in get_all_edges(node_list):
         if edge.name == '__unnamed_edge__':
             if edge.node1 is not None and edge.node2 is not None:
@@ -20,8 +20,13 @@ def get_sublist_from_node_list(node_list):
                 self.name_to_idx[name]=len(self.name_to_idx)
             return self.name_to_idx[name]
     mapper = edges_name_mapper()
+
     sublist_list = [[mapper.get_index(e.name)for e in t.edges] for t in node_list]
-    outlist = [mapper.get_index(e.name) for e in get_all_dangling(node_list)]
+
+    if outlist is None:
+        outlist = [mapper.get_index(e.name) for e in get_all_dangling(node_list)]
+    else:
+        outlist = [mapper.get_index(e.name) for e in outlist]
     return node_list,sublist_list,outlist
 
 def create_templete_2DTN_tn(tn2D_shape_list,engine = np.random.randn):
@@ -60,7 +65,7 @@ def create_templete_2DTN_tn(tn2D_shape_list,engine = np.random.randn):
     node_list = [item for sublist in node_array for item in sublist]
     node_list,sublist_list,outlist = get_sublist_from_node_list(node_list)
     return node_list,sublist_list,outlist
-    
+
 def get_optim_path_by_oe_from_tn(node_list,optimize='random-greedy-128'):
     operands = []
     for node in node_list:

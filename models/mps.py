@@ -58,6 +58,9 @@ class MPSLinear_einsum_uniform_shape(TN_Base):
         # (NB,b,b) <-> (T,b,b,o) <-> (NB,b,b) ==> (NB,T,t)
         return tensor
 
+
+
+
 class MPSLinear_einsum_arbitary_shape(TN_Base):
     '''
     in_features: int,
