@@ -171,21 +171,27 @@ def preprocess_images(image):
     image = image.round().float()
     return torch.stack([1-image,image],-1)
 
-model_list = [MPS_ring_EC_method,MPS_ring_BTN_method,MPS_ring_LP_method]
+model_list = [#MPS_ring_EC_method,
+              MPS_ring_BTN_method,
+              #MPS_ring_LP_method
+              ]
 TIME_NOW    = time.strftime("%m_%d_%H_%M_%S")
+vd = 20
+lr = 0.0001
+epoches = 5
 for MODELTYPE in model_list:
     random_seed=1
     model_name= MODELTYPE.__name__
 
-    ROOTDIR = f"checkpoints/MNIST16x16/{model_name}-{random_seed}-{TIME_NOW}"
+    ROOTDIR = f"checkpoints/MNIST16x16/{model_name}-{random_seed}-vd{vd}-{TIME_NOW}"
     logsys = LoggingSystem(True,ROOTDIR,seed=random_seed)
 
     model  = MODELTYPE(nums=24*24, out_class = 10,batch_num=100,cal_best_path=False,
-                           in_physics_bond = 2, virtual_bond_dim=5,init_std=1e-2)
+                           in_physics_bond = 2, virtual_bond_dim=vd,init_std=1e-2)
     device = 'cuda'
     model  = model.to(device)
 
-    lr=0.001
+
     infiniter = DataSimfetcher(train_loader, device=device)
     optimizer = torch.optim.Adadelta(model.parameters(), lr=lr)
     loss_fn   = torch.nn.CrossEntropyLoss()
@@ -194,9 +200,9 @@ for MODELTYPE in model_list:
     accues=[]
     accu_t=[]
     metric_dict       = logsys.initial_metric_dict(metric_list)
-    master_bar        = logsys.create_master_bar(2)
+    master_bar        = logsys.create_master_bar(epoches)
     #master_bar.set_multiply_graph(figsize=(9,3),engine=[['plot','plot','plot']],labels=[metric_list])
-    accu = loss = -1
+    accu = loss = best = -1
     for epoch in master_bar:
         start_time = time.time()
         model.train()
@@ -218,7 +224,7 @@ for MODELTYPE in model_list:
             acct = acct.item()
             losses.append([time.time(),loss])
             accu_t.append([time.time(),acct])
-            inter_b.lwrite('Epoch: %.3i \t Train_Loss: %.4f \t Train_Accu: %.4f Valid_Accu: %.4f \t Time: %.2f s' %(epoch, loss, acct,accu,time.time() - start_time),end='\r')
+            inter_b.lwrite('Epoch: %.3i \t Train_Loss: %.4f \t Train_Accu: %.4f Valid_Accu: %.4f Valid_best: %.4f \t Time: %.2f s' %(epoch, loss, acct,accu,best,time.time() - start_time),end='\r')
         model.eval()
         prefetcher = DataSimfetcher(test_loader, device=device)
         inter_b    = logsys.create_progress_bar(len(test_loader))
@@ -238,8 +244,8 @@ for MODELTYPE in model_list:
         accu =  torch.sum(pred_labels == labels)/len(labels)
         accu = accu.item()
         accues.append([time.time(),accu])
-
-        inter_b.lwrite('Epoch: %.3i \t Train_Loss: %.4f \t Train_Accu: %.4f Valid_Accu: %.4f \t Time: %.2f s' %(epoch, loss, acct,accu,time.time() - start_time),end='\r')
+        if accu >best:best = accu
+        inter_b.lwrite('Epoch: %.3i \t Train_Loss: %.4f \t Train_Accu: %.4f Valid_Accu: %.4f Valid_best: %.4f \t Time: %.2f s' %(epoch, loss, acct,accu,best,time.time() - start_time),end='\r')
     import os
     project_info = {}
     project_info['lr'] = lr

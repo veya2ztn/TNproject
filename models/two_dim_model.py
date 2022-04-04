@@ -441,6 +441,8 @@ class PEPS_uniform_shape_symmetry_base(TN_Base):
         #    the symmetry map indicate the symmetry group:
         #        if "R4" symmetry, then corn [0,0] [0,-1] [-1,-1] [-1,0] will share same active kernel
         #        so there only end tensor_needed[0] = 1 corn-weight
+        #    [Update]: however, indices rotation is need since
+        #      TODO: realize right indices rotation for symmetry element.
         self.active_index = active_index
 
         self.corn_tensors = nn.Parameter(self.rde2D( (tensor_needed[0],O,P,D,D)  ,init_std, offset=3))
@@ -675,18 +677,20 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
 
+from itertools import permutations
+
 class PEPS_einsum_arbitrary_partition_optim(TN_Base):
-    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_dim=None,virtual_bond_config="models/arbitary_shape/arbitary_shape_1.json",
-                       bias=True,label_position='center',contraction_mode = 'recursion',
-                 init_std=1e-10,
-                 seted_variation=10,
+    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
+                       bias=True,label_position=(8,4),contraction_mode = 'recursion',
+                 init_std=1e-10,fixed_virtual_dim=None,
+                 seted_variation=10,symmetry="Z2_16x9",
                  solved_std=None):
         super().__init__()
-        if virtual_bond_dim is not None:virtual_bond_config = virtual_bond_dim
-        if isinstance(virtual_bond_config,str):
-            arbitary_shape_state_dict = torch.load(virtual_bond_config)
+        self.out_features = out_features
+        if isinstance(virtual_bond_dim,str):
+            arbitary_shape_state_dict = torch.load(virtual_bond_dim)
         else:
-            arbitary_shape_state_dict = virtual_bond_config
+            arbitary_shape_state_dict = virtual_bond_dim
         assert isinstance(arbitary_shape_state_dict,dict)
 
 
@@ -694,24 +698,47 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         info_per_line  = arbitary_shape_state_dict['line']
         info_per_point = arbitary_shape_state_dict['element']
 
-        if solved_std is None:
-            num_of_tensor   = len(info_per_group)
-            list_of_virt_dim= [t['D'] for t in info_per_line.values()]
-            list_of_phys_dim= [len(t['element']) for t in info_per_group.values()]
-            divider         = np.prod([np.power(t,1/num_of_tensor) for t in list_of_phys_dim+list_of_virt_dim])
-            solved_var      = np.power(seted_variation,1/num_of_tensor)/divider
-            solved_std      = np.sqrt(solved_var)
 
+        #symmetry_map = FFT_Z2_symmetry_16x9_point
+        symmetry_map       = {}
+        symmetry_map_point = {}
+        for i,j in info_per_point.keys():
+            group_now  = info_per_point[i,j]['group']
+            symmetry_map[group_now]= set([group_now])
+            symmetry_map_point[i,j]= set([f"{i}-{j}"])
+        if symmetry is not None:
+            if symmetry == "Z2_16x9":
+                for i in list(range(1,8))+list(range(9,16)):
+                    for j in range(9):
+                        group_now  = info_per_point[i,j]['group']
+                        group_sym  = info_per_point[16-i,j]['group']
+                        symmetry_map[group_now]=symmetry_map[group_now]|set([group_sym])
+                        symmetry_map_point[i,j]=symmetry_map_point[i,j]|set([f"{16-i}-{j}"])
+            else:
+                raise NotImplementedError
 
-        center_group    = 0
-        damgling_num    = len(info_per_group)
+        # if we use the symmetry, we need to make sure not only the tensor shape but also the
+        # object that each tensor leg point. That is we need to realign the neighbor for each point.
+        for group_now in range(len(info_per_group)):
+            neighbors = info_per_group[group_now]['neighbor']# neighbors is also a group
+            unique_id = [min(symmetry_map[neighbor_id]) for neighbor_id in neighbors]
+            new_order = np.argsort(unique_id)
+            #print(f"group-{group_now}: old neighbors{neighbors} real neighbor {unique_id} new order {new_order}")
+            info_per_group[group_now]['neighbor'] = [neighbors[i] for i in new_order]
+            elements  =  info_per_group[group_now]['element']
+            unique_id = [min(symmetry_map_point[element]) for element in elements]
+            new_order = np.argsort(unique_id)
+            info_per_group[group_now]['element'] = [elements[i] for i in new_order]
+
+        if fixed_virtual_dim is not None:
+            for key in info_per_line.keys():
+                info_per_line[key]['D'] = fixed_virtual_dim    
+        #since we use symmetry than the center group could not in the symmetry part
+        center_group = info_per_point[label_position]['group']
+        damgling_num = len(info_per_group)
         info_per_group[center_group]['neighbor'].insert(0,damgling_num)
         info_per_line[(center_group,damgling_num)]={'D': out_features}
-
-        self.info_per_group=info_per_group
-        self.info_per_line =info_per_line
-        self.info_per_point=info_per_point
-
+        symmetry_map[damgling_num]=set([damgling_num])
         operands = []
         sublist_list=[]
         outlist  = [list(info_per_line.keys()).index((center_group,damgling_num))]
@@ -734,50 +761,146 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
             ranks_list.append(ranks)
             sublist_list.append(sublist)
-        operands+= [[...,*outlist]]
-        path = self.get_best_contracting_path(*operands)
-        #path,info = oe.contract_path(*operands,optimize='random-greedy-128')
+        operands+= [[*outlist]]
+
+        path,info = oe.contract_path(*operands,optimize='random-greedy-128')
         self.path         = path
         self.sublist_list = sublist_list
         self.outlist      = outlist
 
-        # assume all element for the tensornetwork is indenpendent.
-        # The bond (include physics) list is l0,l1,l2,...,ln
-        # All element follow normal distribution X - sigma(0,alpha)
-        # where alpha is the variation we need to calculated.
-        # the output after contracting is also a tensor (may 1-rank scalar, 2-rank matrix, etc)
-        # the element of the output follow the composite normal distribution Y - sigma(0,beta)
-        # where beta = l0 x l1 x l2 x ... x ln x alpha^(# of tensor)
 
-        unit_list = []
+        unique_unit_list = []
+        # the unique unit list is the real weight for training of the model
+        # if there is no symmetry assign, then each group/block would allocate a weight
+        # then the len(unique_unit_list) == len(info_per_group)
+        # if there is symmetry, then some groups share the weight
+        # then the len(unique_unit_list) < len(info_per_group)
         for i in range(len(sublist_list)):
+
+            for the_symmetry_counterpart in symmetry_map[i]:
+                if 'weight_idx' in info_per_group[the_symmetry_counterpart]:
+                    info_per_group[i]['weight_idx']=info_per_group[the_symmetry_counterpart]["weight_idx"]
+                    info_per_group[i]['symmetry_indices']=info_per_group[the_symmetry_counterpart]["symmetry_indices"]
+                    break
+            if 'weight_idx' in info_per_group[i]:
+                continue
+            # assume all element for the tensornetwork is indenpendent.
+            # The bond (include physics) list is l0,l1,l2,...,ln
+            # All element follow normal distribution X - sigma(0,alpha)
+            # where alpha is the variation we need to calculated.
+            # the output after contracting is also a tensor (may 1-rank scalar, 2-rank matrix, etc)
+            # the element of the output follow the composite normal distribution Y - sigma(0,beta)
+            # where beta = l0 x l1 x l2 x ... x ln x alpha^(# of tensor)
+
+            # if we active the Z2 symmetry, not only the left and right part should be reflected, but also
+            # the center part. Since the center part link two same region, then it should be the symmetry
+            # matrix for the bond it connected.
+            # we would firstly check the neighbor of the group
+            unique_neighbor_group = [min(symmetry_map[neighbor_id]) for neighbor_id in info_per_group[i]['neighbor']]
+            symmetry_indices=None
+            for j in set(unique_neighbor_group):
+                if unique_neighbor_group.count(j)>1:
+                    symmetry_leg_pos = list(np.where(np.array(unique_neighbor_group)==j)[0]+1)# plus 1 since we would add physics dim
+                    if symmetry_indices is not None:
+                        raise NotImplementedError("we now only support one symmetry indices")
+                    symmetry_indices = list(permutations((symmetry_leg_pos)))
+            info_per_group[i]['symmetry_indices'] = symmetry_indices
+            info_per_group[i]['weight_idx']       = len(unique_unit_list)
+
+
             shape = ranks_list[i]
-            P        = len(info_per_group[i]['element'])
+            P     = len(info_per_group[i]['element'])
             #control_mat = self.rde2D((P,*shape),0,physics_index=0,offset= 2 if i==center_group else 1)
             #bias_mat    = torch.normal(0,solved_std,(P,*shape))
             #bias_mat[control_mat.nonzero(as_tuple=True)]=0
-            #unit_list.append(control_mat+bias_mat)
-            #unit_list.append(self.rde2D((P,*shape),init_std,offset=1))
-            unit_list.append(torch.normal(mean=0,std=solved_std,size=(P,*shape)))
-        assert len(unit_list)==len(sublist_list)
+            #unique_unit_list.append(control_mat+bias_mat)
+            unique_unit_list.append(self.rde2D((P,*shape),init_std,offset=1))
+            #unique_unit_list.append(torch.normal(mean=0,std=solved_std,size=(P,*shape)))
+        #assert len(unit_list)==len(sublist_list)
 
-        self.unit_list = [nn.Parameter(v) for v in unit_list]
-        for i, v in enumerate(self.unit_list):
-            self.register_parameter(f'unit_{i}', param=v)
+        self.unique_unit_list = [nn.Parameter(v) for v in unique_unit_list]
+        for i, v in enumerate(self.unique_unit_list):self.register_parameter(f'unit_{i}', param=v)
+        #put the tensor into the AD graph.
+        #assert len(self.unit_list)==len(sublist_list)
+        self.info_per_group=info_per_group
+        self.info_per_line =info_per_line
+        self.info_per_point=info_per_point
+        self.symmetry_map  =symmetry_map
+        self.symmetry_map_point =symmetry_map_point
+
+    def weight_init(self,method=None,set_var=1):
+        if method is None:return
+        if method == "Expecatation_Normalization":
+            num_of_tensor   = len(self.info_per_group)
+            list_of_virt_dim= [t['D'] for t in self.info_per_line.values()]
+            # notice, we cannot count the class label
+            list_of_virt_dim.append(1/self.out_features)
+            list_of_phys_dim= [len(t['element']) for t in self.info_per_group.values()]
+            divider         = np.prod([np.power(t,1/num_of_tensor) for t in list_of_phys_dim+list_of_virt_dim])
+            solved_var      = np.power(set_var,1/num_of_tensor)/divider
+            solved_std      = np.sqrt(solved_var)
+            for i in range(len(self.unique_unit_list)):
+                self.unique_unit_list[i] = torch.nn.init.normal_(self.unique_unit_list[i],mean=0.0, std=solved_std)
+        elif method == "fixpoint_start":
+            for i in range(len(self.unique_unit_list)):
+                shape = self.unique_unit_list[i].shape
+                offset= 1
+                size_shape = shape[:offset]
+                bias_shape = shape[offset:]
+                max_dim    = max(bias_shape)
+                full_rank  = len(bias_shape)
+                half_rank  = full_rank//2
+                rest_rank  = full_rank-half_rank
+                bias_mat   = torch.eye(max_dim**half_rank,max_dim**rest_rank)
+                bias_mat   = bias_mat.reshape(*([max_dim]*full_rank))
+                for j,d in enumerate(bias_shape):
+                    bias_mat   = torch.index_select(bias_mat, j,torch.arange(d))
+                norm   = np.sqrt(np.prod(bias_shape))
+                norm  *= np.sqrt(size_shape[0])
+                #print(norm)
+                bias_mat  /= norm
+                bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
+
+                self.unique_unit_list[i] = torch.nn.init.normal_(self.unique_unit_list[i],mean=0.0, std=np.sqrt(set_var))+ bias_mat
+        elif method == "normlization_to_one":
+            for i in range(len(self.unique_unit_list)):
+                self.unique_unit_list[i] = self.unique_unit_list[i]/torch.norm(self.unique_unit_list[i])
+        else:
+            raise NotImplementedError
+
+
 
     def forward(self,input_data):
         #input data shape B,1,W,H
         assert len(input_data.shape)==4
-        input_data  = input_data.flatten(-3,-1)
+        assert np.prod(input_data.shape[-2:])==len(self.info_per_point)
+        input_data  = input_data.squeeze(1)
 
         _input = []
-        for i,unit in enumerate(self.unit_list):
-            patch_idx  = self.info_per_group[i]['element_idx']
-            batch_input= input_data[...,patch_idx] # B,P
+        #for i,((unit,symmetry_indices),point_idx) in enumerate(zip(unit_list,self.point_of_group)):
+        for i in range(len(self.info_per_group)):
+            #patch_idx  = self.info_per_group[i]['element_idx']
+            #print(f"processing unit {i}: conclude point{patch_idx}")
+            #batch_input= input_data[...,patch_idx] # B,P
+            pool = self.info_per_group[i]
+            point_idx = np.array(pool['element']).transpose()
+            #print(info_per_group[i]["weight_idx"])
+            unit = self.unique_unit_list[pool["weight_idx"]]
+            symmetry_indices = pool['symmetry_indices']
+
+            x,y = point_idx
+            batch_input= input_data[...,x,y] # B,P
+            if symmetry_indices is not None:
+                unit_sys = unit
+                for symmetry_indice in symmetry_indices[1:]:
+                    unit_sys = unit_sys + unit.transpose(*symmetry_indice)
+                unit = unit_sys/len(symmetry_indices)
+            #_units.append(unit)
+            #_input.append(batch_input)
             batch_unit = torch.tensordot(batch_input,unit,dims=([-1], [0]))
             #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
             _input.append(batch_unit)
-
+        #return _input,_units
         operands=[]
         for tensor,sublist in zip(_input,self.sublist_list):
             operand = [tensor,[...,*sublist]]

@@ -61,13 +61,13 @@ def truncated_SVD(tensor,output='RQ',max_singular_values= None,
         output = [u,s,v,Z]
     if reduce:output = [t[0] for t in output]
     return output
-def left_canonicalize_MPS(mps_line,Decomposition_Engine=torch.qr,
+def left_canonicalize_MPS(mps_line,Decomposition_Engine=torch.linalg.qr,
                           normlization =True):
     # for any not canonical mps line
     # the chain size (D,P,D)
     new_chain = []
     R         = None
-    #Z_list    = []# record the scale information for each unit.
+    Z_list    = []# record the scale information for each unit.
     # for a perfect MPS state, we expect the norm for each tensor is 1.
     for i,tensor in enumerate(mps_line):
         if len(tensor.shape)==2:
@@ -80,17 +80,17 @@ def left_canonicalize_MPS(mps_line,Decomposition_Engine=torch.qr,
             new_tensor = new_tensor.reshape(a*b,c)
         else:
             raise NotImplementedError
-
+        Z = torch.norm(new_tensor)
+        Z_list.append(Z)
+        new_tensor /= Z
         if i == len(mps_line) - 1:
-            Z = torch.norm(new_tensor)
-            if normlization:new_tensor /= (Z)
             new_chain.append(new_tensor.reshape(*shape[:-1],-1))
         else:
             Q,R = Decomposition_Engine(new_tensor)[:2]
             Q   = Q.reshape(*shape[:-1],-1)
             new_chain.append(Q)
 
-    return new_chain,[Z]
+    return new_chain,Z_list
 def right_canonicalize_MPS(mps_line,Decomposition_Engine=truncated_SVD,
                           #normlization =True
                           ):
@@ -119,7 +119,7 @@ def right_canonicalize_MPS(mps_line,Decomposition_Engine=truncated_SVD,
         if i == len(mps_line) - 1:
             new_chain.append(new_tensor.reshape(-1,*shape[1:]))
         else:
-            R,Q,svd_Z = Decomposition_Engine(new_tensor)
+            R,Q = Decomposition_Engine(new_tensor)[:2]
             Q   = Q.reshape(-1,*shape[1:])
             new_chain.append(Q)
     new_chain=new_chain[::-1]
