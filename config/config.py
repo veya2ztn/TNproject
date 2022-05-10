@@ -246,4 +246,15 @@ def read_model(user_dic):
     #for key,val in new_pool.items():user_dic[key]=val
     return Config(user_dic)
 def read_data(user_dic):
+    for key,val in user_dic.items():
+        if 'data_curve' in key or 'data_image' in key:
+            if isinstance(val,list):
+                user_dic[key]=[(os.path.join(DATAROOT,v.rstrip('/')) if DATAROOT not in v else v.rstrip('/')) for v in val ]
+            else:
+                if val is not None:
+                    val = val.replace("/root/autodl-nas/data/","")
+                    user_dic[key]=os.path.join(DATAROOT,val.rstrip('/')) if DATAROOT not in val else val.rstrip('/')
+                else:
+                    user_dic[key] = None
+
     return Config(user_dic)

@@ -16,8 +16,12 @@ from mltool import optim as optim
 
 from torchvision import datasets, transforms
 
-#from models import NanValueError
+class NanValueError(Exception):pass
+
+import dataset as dtst
 import models as mdl
+from mltool import lr_schedulers as lrschdl
+from mltool import optim as optim
 
 MEMORYLIMIT = 0.9
 GPU_MEMORY_CONFIG_FILE="projects/GPU_Memory_Config.json"
@@ -55,7 +59,7 @@ def struct_model(project_config,dataset_train,cuda=True):
             if pre_train_weight is not None:model.load_state_dict(weight)
     return model
 
-def struct_dataloader(project_config,only_valid=False,verbose = True):
+def struct_dataloader2(project_config,only_valid=False,verbose = True):
     DATASET_TYPE= project_config.data.dataset_TYPE
     DATASETargs = project_config.data.dataset_args
     transform   = [transforms.ToTensor()]
@@ -83,6 +87,57 @@ def struct_dataloader(project_config,only_valid=False,verbose = True):
     db.dataset_valid= dataset_valid
     db.data_summary = project_config.data.to_dict()
     return db
+
+def struct_dataloader(project_config,only_valid=False,verbose = True):
+    # in this project valid = test
+    CURVETRAIN  = project_config.data.train_data_curve
+    IMAGETRAIN  = project_config.data.train_data_image
+    CURVE_TEST  = project_config.data.valid_data_curve
+    IMAGE_TEST  = project_config.data.valid_data_image
+
+    DATASET_TYPE= project_config.data.dataset_TYPE
+    DATASETargs = project_config.data.dataset_args
+    DATANORMER  = project_config.data.dataset_norm if hasattr(project_config.data,'dataset_norm') else 'max'
+    IMAGENORM   = project_config.data.image_transfermer if hasattr(project_config.data,'image_transfermer') else None
+    #FEATURENUM  = project_config.data.feature_num #20
+    TRANSF_TYPE = project_config.data.transform_TYPE if hasattr(project_config.data,'transform_TYPE') else None
+    TRANS_Config= project_config.data.transform_config if hasattr(project_config.data,'transform_config') else {}
+    DATA_VOLUME = project_config.train.volume if hasattr(project_config.train,'volume') else None
+    transformer  = eval(f"transform.{TRANSF_TYPE}")(**TRANS_Config) if  TRANSF_TYPE is not None else None
+    #transformer = None
+    if only_valid:
+        assert DATANORMER == "none"
+        dataset_valid= eval(f"dtst.{DATASET_TYPE}")(CURVE_TEST,IMAGE_TEST,
+                                    transformer=transformer,normf=DATANORMER,
+                                    case_type='test',verbose=verbose,image_transfermer=IMAGENORM,
+                                    **DATASETargs)
+
+        return dataset_valid,dataset_valid.transformer
+
+    dataset_train= eval(f"dtst.{DATASET_TYPE}")(CURVETRAIN,IMAGETRAIN,
+                                transformer=transformer,normf=DATANORMER,
+                                case_type='train',verbose=verbose,image_transfermer=IMAGENORM,volume=DATA_VOLUME,
+                                **DATASETargs)
+    dataset_valid= eval(f"dtst.{DATASET_TYPE}")(CURVE_TEST,IMAGE_TEST,
+                                transformer=transformer,normf=[dataset_train.forf,dataset_train.invf],
+                                case_type='test',verbose=verbose,image_transfermer=IMAGENORM,
+                                **DATASETargs)
+    if "BCE" in  project_config.model.criterion_type:
+        if len(dataset_train.vector.shape)==1:
+            dataset_train.vector = dataset_train.vector[:,None]
+            dataset_valid.vector = dataset_valid.vector[:,None]
+            dataset_train.curve_type_shape=(1,)
+            dataset_valid.curve_type_shape=(1,)
+        else:
+            dataset_train.curve_type_shape = dataset_train.vector.shape[1:]
+            dataset_valid.curve_type_shape = dataset_valid.vector.shape[1:]
+    db = Project()
+    db.dataset_train= dataset_train
+    db.dataset_valid= dataset_valid
+    db.transformer  = dataset_train.transformer
+    db.data_summary = project_config.data.to_dict()
+    return db
+
 def struct_config(project_config,db = None,build_model=True,verbose=True):
     PROJECTNAME    = project_config.project_name #
     PROJECTFULLNAME= project_config.project_json_name #
@@ -126,6 +181,51 @@ def struct_config(project_config,db = None,build_model=True,verbose=True):
     return model,project,db
 
 def train_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,detail_log=False):
+    if type(model.optimizer).__name__ == 'LBFGS':
+        return train_LBFGS_epoch(model,dataloader,logsys,Fethcher,test_mode,detail_log)
+    else:
+        return train_epoch_normal(model,dataloader,logsys,Fethcher,test_mode,detail_log)
+
+def train_LBFGS_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,detail_log=False):
+    '''
+    train model
+    '''
+    model.train()
+    logsys.train()
+    batches    = len(dataloader)
+    device     = next(model.parameters()).device
+    criterion  = model.criterion
+    global_count = 1
+    total_count  = model.optimizer.param_groups[0]['max_iter']
+    def closure():
+        infiniter = Fethcher(dataloader, device=device)
+        inter_b   = logsys.create_progress_bar(len(dataloader))
+        model.optimizer.zero_grad()
+        loss_all = 0
+        while inter_b.update_step():
+            label,image= infiniter.next()
+            if len(image.shape)!=4:
+                temp  = image
+                image = label
+                label = temp
+            l_pred   = model(image)
+            loss     = criterion(label,l_pred)
+            loss.backward()
+            loss = loss.item()
+            loss_all+=loss
+            logsys.batch_loss_record([loss])
+            outstring="H:{:3}/{:3} Batch:{:3}/{} loss:{:.4f}".format(global_count,total_count,inter_b.now,batches,loss)
+            inter_b.lwrite(outstring, end="\r")
+        return loss_all/len(dataloader.dataset)
+    if hasattr(model.optimizer,"grad_clip") and (model.optimizer.grad_clip is not None):
+        nn.utils.clip_grad_norm_(model.parameters(), model.optimizer.grad_clip)
+    train_loss = -1
+    train_loss     = model.optimizer.step(closure)
+    valid_acc_pool = test_epoch(model,dataloader,logsys,accu_list=['BinaryAL','BinaryPL','BinaryNL'],Fethcher=Fethcher)
+    train_accu     = valid_acc_pool['BinaryAL']
+    return train_loss,train_accu
+
+def train_epoch_normal(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,detail_log=False):
     '''
     train model
     '''
@@ -140,6 +240,10 @@ def train_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,
     train_accu = []
     while inter_b.update_step():
         image,label= prefetcher.next()
+        if len(image.shape)!=4:
+            temp  = image
+            image = label
+            label = temp
         model.optimizer.zero_grad()
 
         logit  = model(image)
@@ -163,6 +267,7 @@ def train_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=False,
         train_loss=np.array(train_loss).mean()
         train_accu=np.array(train_accu).mean()
     return train_loss,train_accu
+
 def test_epoch(model,dataloader,logsys,accu_list=None,Fethcher=DataSimfetcher,inference=False):
     model.eval()
     logsys.eval()
@@ -174,18 +279,25 @@ def test_epoch(model,dataloader,logsys,accu_list=None,Fethcher=DataSimfetcher,in
     logits = []
     with torch.no_grad():
         while inter_b.update_step():
-            image,label= prefetcher.next()
+            image,label= prefetcher.next()[:2]
+            if len(image.shape)!=4:
+                temp  = image
+                image = label
+                label = temp
             logit  = model(image)
-            logit  = logit.squeeze()
-            labels.append(label)
-            logits.append(logit)
+            #logit  = logit.squeeze()
+            labels.append(label.detach().cpu())
+            logits.append(logit.detach().cpu())
     labels  = torch.cat(labels)
     logits  = torch.cat(logits)
-    pred_labels  = torch.argmax(logits,-1)
-    accu =  torch.sum(pred_labels == labels)/len(labels)
-    valid_acc_pool = {'error':1-accu.item()}
-    return valid_acc_pool
-
+    # print(logits.shape)
+    # print(labels.shape)
+    # pred_labels  = torch.argmax(logits,-1)
+    # accu =  torch.sum(pred_labels == labels)/len(labels)
+    # valid_acc_pool = {'error':1-accu.item()}
+    # return valid_acc_pool
+    data=[labels,logits,labels if inference else None]
+    return dataloader.dataset.computer_accurancy(data,accu_list=accu_list,inter_process=inference)
 
 def get_hparam_dict(config):
     #due to the bad performance of tensorboard Hyper Parameter, we need list all HYPER at beginning
@@ -245,6 +357,7 @@ def swa_update_bn(loader, model, device=None):
 
 def do_train(model,project,train_loader,valid_loader,logsys,trial=False):
     return one_complete_train(model,project,train_loader,valid_loader,logsys,trial=trial)
+
 def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=False):
 
     logsys.regist({'task':project.project_name,'model':project.full_config.model.backbone_TYPE})
@@ -268,19 +381,31 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     optimizer_config    = args.train.optimizer.config
     optimizer_TYPE      = args.train.optimizer._TYPE_
     lr = optimizer_config['lr']
-    optimizer           = eval(f"optim.{optimizer_TYPE}")([{'params':model.parameters(),'initial_lr':lr}], **optimizer_config)
+    #optimizer           = eval(f"optim.{optimizer_TYPE}")([{'params':model.parameters(),'initial_lr':lr}], **optimizer_config)
+    optimizer           = eval(f"optim.{optimizer_TYPE}")(model.parameters(), **optimizer_config)
 
     optimizer.grad_clip = args.train.grad_clip
 
-    criterion           = torch.nn.CrossEntropyLoss()
-
+    #criterion           = torch.nn.CrossEntropyLoss()
+    criterion_config    = args.model.criterion_config if hasattr(args.model,'criterion_config') else {}
+    #print(train_loader.dataset.criterion(args.model.criterion_type))
+    if not hasattr(args.model,'criterion_type'):
+        criterion_TYPE = torch.nn.CrossEntropyLoss
+    else:
+        if   args.model.criterion_type == 'BCEWithLogitsLoss': criterion_TYPE = torch.nn.BCEWithLogitsLoss
+        elif args.model.criterion_type == 'CELoss': criterion_TYPE = torch.nn.CrossEntropyLoss
+        else:
+            raise NotImplementedError
+    criterion     = criterion_TYPE(**criterion_config)
 
 
 
 
     hparam_dict         = get_hparam_dict(args)
     logsys.info(hparam_dict)
-    accu_list     = ['error']
+    accu_list     = args.train.accu_list if hasattr(args.train,'accu_list') else None
+    accu_list     = train_loader.dataset.get_default_accu_type() if accu_list is None else accu_list
+
     metric_dict   = logsys.initial_metric_dict(accu_list)
     metric_dict   = metric_dict.metric_dict
     _             = logsys.create_recorder(hparam_dict=hparam_dict,metric_dict=metric_dict)
@@ -375,6 +500,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
                 valid_acc_pool = test_epoch(swa_model,valid_loader,logsys,accu_list=accu_list)
             else:
                 valid_acc_pool = test_epoch(model,valid_loader,logsys,accu_list=accu_list)
+
             update_accu    = logsys.metric_dict.update(valid_acc_pool,epoch)
             metric_dict    = logsys.metric_dict.metric_dict
             for accu_type in accu_list:
@@ -449,7 +575,7 @@ def train_for_one_task(model,project):
     print("-------------------------------------------------------------")
 
     MODEL_NAME  =project.full_config.model.str_backbone_TYPE
-    if "virtual_bond_dim" in project.full_config.model.backbone_config:
+    if hasattr(project.full_config.model,'backbone_config') and "virtual_bond_dim" in project.full_config.model.backbone_config:
         virtual_bond_dim=project.full_config.model.backbone_config['virtual_bond_dim']
         if "_v" not in MODEL_NAME and virtual_bond_dim is not None:
             MODEL_NAME += f"_v{virtual_bond_dim}"

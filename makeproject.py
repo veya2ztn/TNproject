@@ -6,17 +6,22 @@ import numpy as np
 ######################
 #### train config ####
 ######################
-trainbases= [Train_Base_Default.copy({"grad_clip":None,
+trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
+                                                   #'MSError_for_RDN','MSError_for_PTN','MSError_for_PLG',
+                                                   #"ClassifierA","ClassifierP","ClassifierN",
+                                                   'BinaryAL','BinaryPL','BinaryNL'
+                                                    ],
+                                     "grad_clip":None,
                                      'warm_up_epoch':20,
                                      'epoches': 300,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     #'BATCH_SIZE':4000,
+                                     'BATCH_SIZE':400,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':True,
                                      'doanormaldt':True})]
-#hypertuner= [Normal_Train_Default]
+
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not_prune':True,
                                        'optimizer_list':{
                                                 'Adam':{'lr':[0.005,0.05],  'betas':[[0.5,0.9],0.999]},
@@ -25,10 +30,11 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not
                                        #'drop_rate_range':[0.1,0.25],
                                        'grad_clip_list':[None],
                                                         })]
-
+hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
 #schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
-optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
+#optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
+optimizers= [Optimizer_lbfgs.copy({"config":{"lr":0.1,'max_iter':1}})]
 earlystops= [Earlystop_NMM_Default.copy({"_TYPE_":"no_min_more","config":{"es_max_window":40}})]
 anormal_detect= [Anormal_D_DC_Default.copy({"_TYPE_":"decrease_counting",
                                       "config":{"stop_counting":30,
@@ -41,13 +47,18 @@ train_config_list = [ConfigCombine({"base":[b,h], "scheduler":[s], "earlystop":[
                         for a in anormal_detect]
 
 MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.FashionMNIST','dataset_args':{'root':DATAROOT+f"/FashionMNIST",'download':True}})
+msdataT_RDNfft   =msdataT_RDN.copy({'image_transfermer':'fft16x9_norm'})
 dmlist=[
-           (MNIST_DATA_Config,
-            backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
-                                     'backbone_config':{'virtual_bond_dim':6,'init_std':1},
-                                     'train_batches':1000
-                                     })
-           ),
+           # (MNIST_DATA_Config,
+           #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
+           #                           'backbone_config':{'virtual_bond_dim':6,'init_std':1},
+           #                           'train_batches':1000
+           #                           })
+           # ),
+           [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",'criterion_config':{'size_average':'sum'},
+           'backbone_TYPE':'PEPS_arbitary_shape_16x9_2_Z2_symmetry','backbone_config':{},
+           'backbone_alias':'PEPS_arbitary_shape_16x9_2_Z2_symmetry',
+           })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
            #                           'backbone_config':{'W':6,'H':6,'virtual_bond_dim':6,'in_physics_bond':16,'init_std': 1e-5},

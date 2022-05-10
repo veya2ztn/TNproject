@@ -34,7 +34,7 @@ hostname = socket.gethostname()
 
 from utils import mymovefile,makerecard
 from mltool.sendinfo.send2phone import send_message
-from models import NanValueError
+from train_base import NanValueError
 from config import read_config,json_to_config
 
 import torch.multiprocessing as mp

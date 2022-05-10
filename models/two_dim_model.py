@@ -732,7 +732,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
         if fixed_virtual_dim is not None:
             for key in info_per_line.keys():
-                info_per_line[key]['D'] = fixed_virtual_dim    
+                info_per_line[key]['D'] = fixed_virtual_dim
         #since we use symmetry than the center group could not in the symmetry part
         center_group = info_per_point[label_position]['group']
         damgling_num = len(info_per_group)
@@ -827,6 +827,9 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         self.info_per_point=info_per_point
         self.symmetry_map  =symmetry_map
         self.symmetry_map_point =symmetry_map_point
+        self.pre_activate_layer = nn.Identity()
+
+
 
     def weight_init(self,method=None,set_var=1):
         if method is None:return
@@ -837,6 +840,17 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             list_of_virt_dim.append(1/self.out_features)
             list_of_phys_dim= [len(t['element']) for t in self.info_per_group.values()]
             divider         = np.prod([np.power(t,1/num_of_tensor) for t in list_of_phys_dim+list_of_virt_dim])
+            solved_var      = np.power(set_var,1/num_of_tensor)/divider
+            solved_std      = np.sqrt(solved_var)
+            for i in range(len(self.unique_unit_list)):
+                self.unique_unit_list[i] = torch.nn.init.normal_(self.unique_unit_list[i],mean=0.0, std=solved_std)
+        elif method == "Expecatation_Normalization2":
+            num_of_tensor   = len(self.info_per_group)
+            list_of_virt_dim= [t['D'] for t in self.info_per_line.values()]
+            # notice, we cannot count the class label
+            list_of_virt_dim.append(1/self.out_features)
+            list_of_phys_dim= [len(t['element']) for t in self.info_per_group.values()]
+            divider         = np.prod([np.power(t,1/num_of_tensor) for t in list_of_virt_dim])
             solved_var      = np.power(set_var,1/num_of_tensor)/divider
             solved_std      = np.sqrt(solved_var)
             for i in range(len(self.unique_unit_list)):
@@ -898,6 +912,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             #_units.append(unit)
             #_input.append(batch_input)
             batch_unit = torch.tensordot(batch_input,unit,dims=([-1], [0]))
+            batch_unit = self.pre_activate_layer(batch_unit)
             #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
             _input.append(batch_unit)
         #return _input,_units
@@ -907,3 +922,25 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             operands+=operand
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
+
+class scale_sigmoid(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.nonlinear=  nn.Tanh()
+    def forward(self,x):
+        x = self.nonlinear(x)
+        #print(f"===>{torch.std_mean(x),x.shape}")
+        mi= len(x.shape[1:])
+        se= x.shape[-1]
+        coef = np.power(se,1/mi)
+        x = x/coef
+        return x
+
+
+def PEPS_arbitary_shape_16x9_2_Z2_symmetry(**kargs):
+    model = PEPS_einsum_arbitrary_partition_optim(out_features=1,virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
+                                                  symmetry="Z2_16x9",
+                                                  label_position=(8,4),fixed_virtual_dim=5)
+    model.weight_init(method="Expecatation_Normalization2")
+    model.pre_activate_layer =scale_sigmoid()
+    return model
