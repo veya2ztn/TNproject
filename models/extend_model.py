@@ -13,6 +13,7 @@ import torch.nn as nn
 import numpy as np
 from .two_dim_model import *
 from .two_dim_model_backup import *
+from .convND import convNd
 class Patch2NetworkInput(nn.Module):
     def __init__(self,divide,reverse=True):
         super().__init__()
@@ -109,3 +110,137 @@ class ArbitaryPartitionModel1(nn.Module):
     def forward(self,x):
         x = self.network_layer(x) #(B,16)
         return x
+
+# class scale_sigmoid(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.nonlinear=  nn.Tanh()
+#     def forward(self,x):
+#         x = self.nonlinear(x)
+#         #print(f"===>{torch.std_mean(x),x.shape}")
+#         mi= len(x.shape[1:])
+#         se= x.shape[-1]
+#         coef = np.power(se,1/mi)
+#         x = x/coef
+#         return x
+#
+# def PEPS_arbitary_shape_16x9_2_Z2_symmetry(**kargs):
+#     model = PEPS_einsum_arbitrary_partition_optim(out_features=1,virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
+#                                                   symmetry="Z2_16x9",
+#                                                   label_position=(8,4),fixed_virtual_dim=5)
+#     model.weight_init(method="Expecatation_Normalization2")
+#     model.pre_activate_layer =scale_sigmoid()
+#     return model
+
+class scaled_Tanh(nn.Module):
+    def __init__(self,coef):
+        super().__init__()
+        self.nonlinear=  nn.Tanh()
+        self.coef = coef
+    def forward(self,x):
+        x = self.nonlinear(x)
+        x = x/self.coef
+        return x
+
+def get_ConND(in_channels,out_channels,num_dims,bias=True,**kargs):
+    if num_dims == 1:
+        cnn = torch.nn.Conv1d(in_channels,out_channels,bias=bias,**kargs)
+    elif num_dims == 2:
+        cnn = torch.nn.Conv2d(in_channels,out_channels,bias=bias,**kargs)
+    elif num_dims == 3:
+        cnn = torch.nn.Conv3d(in_channels,out_channels,bias=bias,**kargs)
+    else:
+        cnn = convNd(in_channels=in_channels,out_channels=out_channels,num_dims=num_dims,use_bias=bias,
+                      **kargs)
+    return cnn
+
+class TensorNetConvND(nn.Module):
+
+    def reset_parameters(self):
+        def init_weights(m):
+            if isinstance(m, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+                torch.nn.init.xavier_uniform_(m.weight)
+                #torch.nn.init.kaiming_normal_(m.weight) for leack ReLU
+                if m.bias is not None:torch.nn.init.zeros_(m.bias)
+        self.apply(init_weights)
+
+    def forward(self,x):
+        squeeze = False
+        if len(x.shape) ==self.num_dims + 1:
+            x = x.unsqueeze(1)
+            squeeze=True
+        res = x
+        out = self.engine(x)
+        out+= res
+        x = self.resize_layer(out)
+        if squeeze:
+            x = x.squeeze(1)
+        return x
+
+class TensorNetConvND_Single(TensorNetConvND):
+    def __init__(self,shape,offset,channels):
+        super().__init__()
+        num_dims      = len(shape) - offset
+        self.num_dims = num_dims
+        in_channels = out_channels = channels
+        kargs = {'kernel_size':3,
+                 'stride':1,
+                 'padding':1,
+                }
+        active_shape = shape[offset:]
+        cnn1 = get_ConND(in_channels,out_channels,num_dims,bias=False,**kargs)
+        bn1  = nn.LayerNorm(active_shape)
+        self.engine = nn.Sequential(cnn1,bn1)
+
+
+        factor = np.prod(active_shape)
+        mi  = 1.0/len(active_shape)
+        #coef   = np.sqrt(np.sqrt(factor))
+        coef   = np.sqrt(np.power(factor,mi))
+        self.resize_layer=scaled_Tanh(coef)
+        self.reset_parameters()
+
+class TensorNetConvND_Block_a(TensorNetConvND):
+    def __init__(self,shape,offset,channels,interchannels=4):
+        super().__init__()
+        num_dims      = len(shape) - offset
+        self.num_dims = num_dims
+        in_channels = out_channels = channels
+        kargs = {'kernel_size':3,
+                 'stride':1,
+                 'padding':1,
+                }
+        active_shape = shape[offset:]
+        cnn1 = get_ConND(  in_channels,interchannels,num_dims,bias=False,**kargs)
+        cnn2 = get_ConND(interchannels,out_channels ,num_dims,bias=False,**kargs)
+        relu = nn.Tanh()
+        bn1  = nn.LayerNorm(active_shape)
+        bn2  = nn.LayerNorm(active_shape)
+        self.engine = nn.Sequential(cnn1,bn1,relu,cnn2,bn2)
+
+
+        factor = np.prod(active_shape)
+        mi  = 1.0/len(active_shape)
+        #coef   = np.sqrt(np.sqrt(factor))
+        coef   = np.sqrt(np.power(factor,mi))
+        self.resize_layer=scaled_Tanh(coef)
+        self.reset_parameters()
+
+class PEPS_16x9_Z2_Binary_Wrapper:
+    def __init__(self,module,**kargs):
+        self.module   = module
+        self.__name__ = f"PEPS_16x9_Z2_Binary_{module.__class__.__name__}"
+
+    def __call__(self,**kargs):
+        model=PEPS_einsum_arbitrary_partition_optim(out_features=1,
+                                                virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
+                                                label_position=(8,4),
+                                                symmetry="Z2_16x9",
+                                                patch_engine=self.module,
+                                                #fixed_virtual_dim=4
+                                               )
+        model.weight_init(method="Expecatation_Normalization2")
+        return model
+
+PEPS_16x9_Z2_Binary_CNN_0 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single)
+PEPS_16x9_Z2_Binary_CNN_1 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a)

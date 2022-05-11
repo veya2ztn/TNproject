@@ -562,6 +562,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     logsys.send_info_to_hub(EXP_HUB)
     logsys.close()
     return metric_dict['best_'+accu_list[0]][accu_list[0]]
+
 def train_for_one_task(model,project):
     # model,project= struct_config(project_config,db=db,build_model=False)
     train_loader = project.train_loader

@@ -2,6 +2,7 @@ from .tensornetwork_base import *
 from .model_utils import *
 import opt_einsum as oe
 import numpy as np
+from itertools import permutations
 
 class PEPS_einsum_uniform_shape(TN_Base):
     def __init__(self, W,H,out_features,
@@ -677,14 +678,16 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
 
-from itertools import permutations
-
 class PEPS_einsum_arbitrary_partition_optim(TN_Base):
-    def __init__(self,out_features=10,in_physics_bond = 2, virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
-                       bias=True,label_position=(8,4),contraction_mode = 'recursion',
-                 init_std=1e-10,fixed_virtual_dim=None,
-                 seted_variation=10,symmetry="Z2_16x9",
-                 solved_std=None):
+    def __init__(self,out_features,
+                      virtual_bond_dim,#"models/arbitary_shape/arbitary_shape_16x9_2.json",
+                      label_position,#=(8,4),
+                       fixed_virtual_dim=None,
+                       patch_engine=torch.nn.Identity,
+                       symmetry=None,#"Z2_16x9",
+                       seted_variation=10,
+                       init_std=1e-10,
+                       solved_std=None):
         super().__init__()
         self.out_features = out_features
         if isinstance(virtual_bond_dim,str):
@@ -700,22 +703,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
 
         #symmetry_map = FFT_Z2_symmetry_16x9_point
-        symmetry_map       = {}
-        symmetry_map_point = {}
-        for i,j in info_per_point.keys():
-            group_now  = info_per_point[i,j]['group']
-            symmetry_map[group_now]= set([group_now])
-            symmetry_map_point[i,j]= set([f"{i}-{j}"])
-        if symmetry is not None:
-            if symmetry == "Z2_16x9":
-                for i in list(range(1,8))+list(range(9,16)):
-                    for j in range(9):
-                        group_now  = info_per_point[i,j]['group']
-                        group_sym  = info_per_point[16-i,j]['group']
-                        symmetry_map[group_now]=symmetry_map[group_now]|set([group_sym])
-                        symmetry_map_point[i,j]=symmetry_map_point[i,j]|set([f"{16-i}-{j}"])
-            else:
-                raise NotImplementedError
+        symmetry_map,symmetry_map_point = self.generate_symmetry_map(symmetry,info_per_point)
 
         # if we use the symmetry, we need to make sure not only the tensor shape but also the
         # object that each tensor leg point. That is we need to realign the neighbor for each point.
@@ -818,7 +806,17 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             #unique_unit_list.append(torch.normal(mean=0,std=solved_std,size=(P,*shape)))
         #assert len(unit_list)==len(sublist_list)
 
-        self.unique_unit_list = [nn.Parameter(v) for v in unique_unit_list]
+        self.unique_unit_list         = [nn.Parameter(v) for v in unique_unit_list]
+        self.unique_groupwise_backend = nn.ModuleList()
+        center_group_unique_idx = info_per_group[center_group]["weight_idx"]
+        for i,v in enumerate(unique_unit_list):
+            if i == center_group_unique_idx:
+                offset = 1
+                inchan = out_features
+            else:
+                offset = 0
+                inchan = 1
+            self.unique_groupwise_backend.append(patch_engine(v.shape[1:],offset,inchan))
         for i, v in enumerate(self.unique_unit_list):self.register_parameter(f'unit_{i}', param=v)
         #put the tensor into the AD graph.
         #assert len(self.unit_list)==len(sublist_list)
@@ -829,7 +827,24 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         self.symmetry_map_point =symmetry_map_point
         self.pre_activate_layer = nn.Identity()
 
-
+    def generate_symmetry_map(self,symmetry,info_per_point):
+        symmetry_map       = {}
+        symmetry_map_point = {}
+        for i,j in info_per_point.keys():
+            group_now  = info_per_point[i,j]['group']
+            symmetry_map[group_now]= set([group_now])
+            symmetry_map_point[i,j]= set([f"{i}-{j}"])
+        if symmetry is not None:
+            if symmetry == "Z2_16x9":
+                for i in list(range(1,8))+list(range(9,16)):
+                    for j in range(9):
+                        group_now  = info_per_point[i,j]['group']
+                        group_sym  = info_per_point[16-i,j]['group']
+                        symmetry_map[group_now]=symmetry_map[group_now]|set([group_sym])
+                        symmetry_map_point[i,j]=symmetry_map_point[i,j]|set([f"{16-i}-{j}"])
+            else:
+                raise NotImplementedError
+        return symmetry_map,symmetry_map_point
 
     def weight_init(self,method=None,set_var=1):
         if method is None:return
@@ -882,8 +897,6 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         else:
             raise NotImplementedError
 
-
-
     def forward(self,input_data):
         #input data shape B,1,W,H
         assert len(input_data.shape)==4
@@ -891,6 +904,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         input_data  = input_data.squeeze(1)
 
         _input = []
+        _units = []
         #for i,((unit,symmetry_indices),point_idx) in enumerate(zip(unit_list,self.point_of_group)):
         for i in range(len(self.info_per_group)):
             #patch_idx  = self.info_per_group[i]['element_idx']
@@ -900,20 +914,35 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             point_idx = np.array(pool['element']).transpose()
             #print(info_per_group[i]["weight_idx"])
             unit = self.unique_unit_list[pool["weight_idx"]]
+            unit_engine = self.unique_groupwise_backend[pool["weight_idx"]]
             symmetry_indices = pool['symmetry_indices']
 
             x,y = point_idx
             batch_input= input_data[...,x,y] # B,P
-            if symmetry_indices is not None:
-                unit_sys = unit
-                for symmetry_indice in symmetry_indices[1:]:
-                    unit_sys = unit_sys + unit.transpose(*symmetry_indice)
-                unit = unit_sys/len(symmetry_indices)
+            # the correct way to follow the sprit is symmetry the weight
+            # however, if there is no further processing, it is same to so contractrion than do symmetry.
+            # what's more, if we use further processing, it much more convience to do symmetriy later rather than
+            # create a symmetric further processing for symmetric weight.
+            #if symmetry_indices is not None:
+            #    unit_sys = unit
+            #    for symmetry_indice in symmetry_indices[1:]:
+            #        unit_sys = unit_sys + unit.transpose(*symmetry_indice)
+            #    unit = unit_sys/len(symmetry_indices)
             #_units.append(unit)
             #_input.append(batch_input)
+
             batch_unit = torch.tensordot(batch_input,unit,dims=([-1], [0]))
             batch_unit = self.pre_activate_layer(batch_unit)
+            #print(f"{batch_unit.shape}->",end=' ')
+            batch_unit = unit_engine(batch_unit)
+            #print(f"{batch_unit.shape}",end='\n')
             #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
+
+            if symmetry_indices is not None:
+                unit_sys = batch_unit
+                for symmetry_indice in symmetry_indices[1:]:
+                    unit_sys = unit_sys + batch_unit.transpose(*symmetry_indice)
+                batch_unit = unit_sys/len(symmetry_indices)
             _input.append(batch_unit)
         #return _input,_units
         operands=[]
@@ -922,25 +951,3 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             operands+=operand
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
-
-class scale_sigmoid(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.nonlinear=  nn.Tanh()
-    def forward(self,x):
-        x = self.nonlinear(x)
-        #print(f"===>{torch.std_mean(x),x.shape}")
-        mi= len(x.shape[1:])
-        se= x.shape[-1]
-        coef = np.power(se,1/mi)
-        x = x/coef
-        return x
-
-
-def PEPS_arbitary_shape_16x9_2_Z2_symmetry(**kargs):
-    model = PEPS_einsum_arbitrary_partition_optim(out_features=1,virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
-                                                  symmetry="Z2_16x9",
-                                                  label_position=(8,4),fixed_virtual_dim=5)
-    model.weight_init(method="Expecatation_Normalization2")
-    model.pre_activate_layer =scale_sigmoid()
-    return model
