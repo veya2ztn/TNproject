@@ -16,7 +16,7 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                      'epoches': 300,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':400,
+                                     'BATCH_SIZE':1500,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':True,
@@ -30,11 +30,11 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not
                                        #'drop_rate_range':[0.1,0.25],
                                        'grad_clip_list':[None],
                                                         })]
-hypertuner= [Normal_Train_Default]
+#hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
 #schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
-#optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
-optimizers= [Optimizer_lbfgs.copy({"config":{"lr":0.1,'max_iter':1}})]
+optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
+#optimizers= [Optimizer_lbfgs.copy({"config":{"lr":0.01,'max_iter':20}})]
 earlystops= [Earlystop_NMM_Default.copy({"_TYPE_":"no_min_more","config":{"es_max_window":40}})]
 anormal_detect= [Anormal_D_DC_Default.copy({"_TYPE_":"decrease_counting",
                                       "config":{"stop_counting":30,
@@ -55,9 +55,9 @@ dmlist=[
            #                           'train_batches':1000
            #                           })
            # ),
-           [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",'criterion_config':{'size_average':'sum'},
-           'backbone_TYPE':'PEPS_arbitary_shape_16x9_2_Z2_symmetry','backbone_config':{},
-           'backbone_alias':'PEPS_arbitary_shape_16x9_2_Z2_symmetry',
+           [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
            })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',

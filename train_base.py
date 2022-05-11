@@ -210,13 +210,14 @@ def train_LBFGS_epoch(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode=
                 label = temp
             l_pred   = model(image)
             loss     = criterion(label,l_pred)
+            loss     = loss/len(dataloader.dataset)
             loss.backward()
             loss = loss.item()
             loss_all+=loss
             logsys.batch_loss_record([loss])
             outstring="H:{:3}/{:3} Batch:{:3}/{} loss:{:.4f}".format(global_count,total_count,inter_b.now,batches,loss)
             inter_b.lwrite(outstring, end="\r")
-        return loss_all/len(dataloader.dataset)
+        return loss_all
     if hasattr(model.optimizer,"grad_clip") and (model.optimizer.grad_clip is not None):
         nn.utils.clip_grad_norm_(model.parameters(), model.optimizer.grad_clip)
     train_loss = -1

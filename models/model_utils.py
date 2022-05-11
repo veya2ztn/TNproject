@@ -182,7 +182,7 @@ def get_best_path_via_oe(equation,tensor_l,store=None):
     saveQ = False
     path_store_path = None
     if store is None:
-        path = oe.contract_path(equation, *tensor_l)[0]
+        path = oe.contract_path(equation, *tensor_l,optimize='random-greedy-128')[0]
     else:
         array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
         if isinstance(store,str):
@@ -193,7 +193,7 @@ def get_best_path_via_oe(equation,tensor_l,store=None):
                 store={}
         assert isinstance(store,dict)
         if array_string not in store:
-            path = oe.contract_path(equation, *tensor_l)[0]
+            path = oe.contract_path(equation, *tensor_l,optimize='random-greedy-128')[0]
             store[array_string]={}
             store[array_string]['path']=path
             saveQ = True
