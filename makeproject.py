@@ -13,27 +13,27 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                                     ],
                                      "grad_clip":None,
                                      'warm_up_epoch':20,
-                                     'epoches': 300,
+                                     'epoches': 100,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':350,
+                                     'BATCH_SIZE':1350,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
-                                     'doearlystop':True,
+                                     'doearlystop':False,
                                      'doanormaldt':True})]
 
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_prune':True,
                                        'optimizer_list':{
-                                                'Adam':{'lr':[0.0005,0.05],  'betas':[[0.5,0.9],0.999]},
+                                                'Adam':{'lr':[1e-4,1e-2],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
                                                 },
-                                       'drop_rate_range':[0,0.5],
+                                       #'drop_rate_range':[0,0.5],
                                        'grad_clip_list':[None,1,5],
                                                         })]
-hypertuner= [Normal_Train_Default]
+#hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
 #schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
-optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
+optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
 #optimizers= [Optimizer_lbfgs.copy({"config":{"lr":0.01,'max_iter':20}})]
 earlystops= [Earlystop_NMM_Default.copy({"_TYPE_":"no_min_more","config":{"es_max_window":40}})]
 anormal_detect= [Anormal_D_DC_Default.copy({"_TYPE_":"decrease_counting",
@@ -56,8 +56,8 @@ dmlist=[
            #                           })
            # ),
            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_full','backbone_config':{},
-           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_full',
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
            })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',

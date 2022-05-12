@@ -120,7 +120,7 @@ class scale_sigmoid(nn.Module):
         #print(f"===>{torch.std_mean(x),x.shape}")
         mi= len(x.shape[1:])
         se= x.shape[-1]
-        coef = np.power(se,1/mi)
+        coef = np.sqrt(np.sqrt(se/2))
         x = x/coef
         return x
 
@@ -244,7 +244,8 @@ def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
                                             label_position=(8,4),
                                             symmetry="Z2_16x9",
                                             #patch_engine=self.module,
-                                            fixed_virtual_dim=2)
-    model.weight_init(method="Expecatation_Normalization2")
+                                            fixed_virtual_dim=2, # if D=3 require 18G for inference
+                                            convertPeq1=True)
+    model.weight_init(method="Expecatation_Normalization")
     model.pre_activate_layer =scale_sigmoid()
     return model

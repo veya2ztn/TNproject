@@ -944,7 +944,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             batch_unit = unit_engine(batch_unit)
             #print(f"{batch_unit.shape}",end='\n')
             #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
-            print(batch_unit.shape)
+            #print(batch_unit.shape)
             if symmetry_indices is not None:
                 unit_sys = batch_unit
                 for symmetry_indice in symmetry_indices[1:]:

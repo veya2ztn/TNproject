@@ -86,6 +86,7 @@ tested_model_pool={}
 fouce_break   = False
 torch.backends.cudnn.enabled  = True
 torch.backends.cudnn.benchmark= False
+torch.backends.cudnn.deterministic= True # the key for continue training.
 
 while (len(get_jobs(PROJECTFILES))>0 or args.mode == "assign")and (not fouce_break):
     if  args.mode == "assign":
