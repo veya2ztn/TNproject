@@ -25,6 +25,15 @@ class TN_Base(nn.Module):
                 self.path_record_file = path_record
             else:
                 self.path_record = path_record
+    def set_drop_prob(self,p):
+        def set_dropout(model, drop_rate=0.1):
+            for name, child in model.named_children():
+                if isinstance(child, torch.nn.Dropout):
+                    child.p = drop_rate
+                    #print(f"sef dropout {drop_rate} for {child}")
+                set_dropout(child, drop_rate=drop_rate)
+        set_dropout(self, drop_rate=p)
+
     @staticmethod
     def rde1(shape,init_std):
         if len(shape) == 2:
@@ -179,5 +188,3 @@ class TN_Base(nn.Module):
 
     def weight_init(self):
         raise NotImplementedError
-
-    

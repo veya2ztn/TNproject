@@ -173,10 +173,12 @@ class TensorNetConvND(nn.Module):
         out = self.engine(x)
         out+= res
         x = self.resize_layer(out)
+        x = self.dropout(x)
         if squeeze:
             x = x.squeeze(1)
         return x
 
+    
 class TensorNetConvND_Single(TensorNetConvND):
     def __init__(self,shape,offset,channels):
         super().__init__()
@@ -191,7 +193,7 @@ class TensorNetConvND_Single(TensorNetConvND):
         cnn1 = get_ConND(in_channels,out_channels,num_dims,bias=False,**kargs)
         bn1  = nn.LayerNorm(active_shape)
         self.engine = nn.Sequential(cnn1,bn1)
-
+        self.dropout= nn.Dropout(p=0.1)
 
         factor = np.prod(active_shape)
         mi  = 1.0/len(active_shape)
@@ -217,7 +219,7 @@ class TensorNetConvND_Block_a(TensorNetConvND):
         bn1  = nn.LayerNorm(active_shape)
         bn2  = nn.LayerNorm(active_shape)
         self.engine = nn.Sequential(cnn1,bn1,relu,cnn2,bn2)
-
+        self.dropout= nn.Dropout(p=0.1)
 
         factor = np.prod(active_shape)
         mi  = 1.0/len(active_shape)

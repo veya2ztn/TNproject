@@ -16,19 +16,19 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                      'epoches': 300,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':1500,
+                                     'BATCH_SIZE':350,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':True,
                                      'doanormaldt':True})]
 
-hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':20},'not_prune':True,
+hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_prune':True,
                                        'optimizer_list':{
-                                                'Adam':{'lr':[0.005,0.05],  'betas':[[0.5,0.9],0.999]},
+                                                'Adam':{'lr':[0.0005,0.05],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
                                                 },
-                                       #'drop_rate_range':[0.1,0.25],
-                                       'grad_clip_list':[None],
+                                       'drop_rate_range':[0,0.5],
+                                       'grad_clip_list':[None,1,5],
                                                         })]
 #hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
@@ -56,8 +56,8 @@ dmlist=[
            #                           })
            # ),
            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{},
-           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_1','backbone_config':{},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_1',
            })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',

@@ -239,6 +239,7 @@ def train_epoch_normal(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode
     inter_b    = logsys.create_progress_bar(batches)
     train_loss = []
     train_accu = []
+
     while inter_b.update_step():
         image,label= prefetcher.next()
         if len(image.shape)!=4:
@@ -248,8 +249,7 @@ def train_epoch_normal(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode
         model.optimizer.zero_grad()
 
         logit  = model(image)
-        logit  = logit.squeeze()
-        loss   = torch.nn.CrossEntropyLoss()(logit,label)
+        loss   = criterion(logit,label)
         loss.backward()
         if hasattr(model.optimizer,"grad_clip") and (model.optimizer.grad_clip is not None):
             nn.utils.clip_grad_norm_(model.parameters(), model.optimizer.grad_clip)
@@ -257,8 +257,8 @@ def train_epoch_normal(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode
         if model.scheduler is not None:model.scheduler.step()
 
         loss = loss.cpu().item()
-        accu = (torch.sum(torch.argmax(logit,-1) == label)/len(label)).cpu().item()
-        logsys.batch_loss_record([loss,accu])
+        accu = loss#(torch.sum(torch.argmax(logit,-1) == label)/len(label)).cpu().item()
+        logsys.batch_loss_record([loss])
         train_loss.append(loss)
         train_accu.append(accu)
         outstring="Batch:{:3}/{} loss:{:.4f} accu:{:.3f}".format(inter_b.now,batches,loss,accu)
@@ -468,12 +468,13 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     drop_out_limit= args.train.drop_out_limit if hasattr(args.train,'drop_out_limit') else None
     drop_out_limit= epoches if not drop_out_limit else drop_out_limit
     bad_condition_happen = False
-
+    if drop_rate is not None:model.set_drop_prob(drop_rate)
+    
     for epoch in master_bar:
         if epoch < start_epoch:continue
         ### training phase ########
         if epoch > start_epoch or (not show_start_status):
-            if drop_rate is not None and hasattr(model,set_drop_prob):model.set_drop_prob(drop_rate* epoch / drop_out_limit if epoch<drop_out_limit else drop_rate)
+            #if drop_rate is not None and hasattr(model,set_drop_prob):model.set_drop_prob(drop_rate* epoch / drop_out_limit if epoch<drop_out_limit else drop_rate)
             # depend on will the first epoch reveal the model performance, default is will
             if hasattr(train_loader.sampler,'set_epoch'):train_loader.sampler.set_epoch(epoch)
             train_loss,train_accu = train_epoch(model,train_loader,logsys)

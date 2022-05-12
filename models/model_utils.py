@@ -178,13 +178,34 @@ def full_size_array_string(*operands):
             array_string.append(shape)
         array_string=','.join(array_string)
     return array_string
-def get_best_path_via_oe(equation,tensor_l,store=None):
+import math
+def get_best_path_via_oe(*operands,store=None,re_saveQ=False):
     saveQ = False
     path_store_path = None
-    if store is None:
-        path = oe.contract_path(equation, *tensor_l,optimize='random-greedy-128')[0]
-    else:
+    if isinstance(operands[0],str):
+        equation = operands[0]
+        tensor_l = operands[1:]
         array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
+    else:
+        equation = operands[:-1]
+        tensor_l = operands[-1]
+        array_string=[]
+        for t in operands:
+            if isinstance(t,list):
+                # t is sublist
+                shape =[ l for l in t if l is not Ellipsis]
+                shape = "["+",".join([str(t) for t in shape])+"]"
+            else:
+                # t is a tensor
+                shape = list(t.shape)
+                shape = "("+",".join([str(t) for t in shape])+")"
+            array_string.append(shape)
+        array_string=','.join(array_string)
+
+    if store is None:
+        path = oe.contract_path(*operands,optimize='random-greedy-128')[0]
+    else:
+        #array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
         if isinstance(store,str):
             path_store_path = store
             if os.path.exists(path_store_path):
@@ -192,15 +213,45 @@ def get_best_path_via_oe(equation,tensor_l,store=None):
             else:
                 store={}
         assert isinstance(store,dict)
-        if array_string not in store:
-            path = oe.contract_path(equation, *tensor_l,optimize='random-greedy-128')[0]
-            store[array_string]={}
-            store[array_string]['path']=path
-            saveQ = True
-        path        = store[array_string]['path']
-        if saveQ and path_store_path is not None:
-            with open(path_store_path,'w') as f:
-                json.dump(store,f)
+        path_pool = store
+        shape_array_string = array_string
+        if array_string not in store or re_saveQ:
+            T_list = [1000,100,10,1,0.1,0.1]
+            for anneal_idx in [0,1,2]:
+                optimizer = oe.RandomGreedy(max_time=20, max_repeats=1000)
+                for T in T_list[anneal_idx:]:
+                    optimizer.temperature = T
+                    path_rand_greedy = oe.contract_path(*operands, optimize=optimizer)
+                    print(math.log2(optimizer.best['flops']))
+                optimizer.best['path']        = oe.paths.ssa_to_linear(optimizer.best['ssa_path'])
+                # optimizer.best['outlist']     = outlist
+                # optimizer.best['sublist_list']= sublist_list
+            if shape_array_string not in path_pool:
+                path_pool[shape_array_string] = optimizer.best
+                re_saveQ=True
+                print(f"save best:float-({optimizer.best['flops']})")
+            else:
+                save_best_now = path_pool[shape_array_string]
+                if ('flops' not in save_best_now) or (optimizer.best['flops'] < save_best_now['flops']):
+                    if 'flops' in save_best_now:print(f"old best:float-({save_best_now['flops']})")
+                    print(f"now best:float-({optimizer.best['flops']})")
+                    re_saveQ=True
+                    path_pool[shape_array_string] = optimizer.best
+                else:
+                    re_saveQ=False
+            if re_saveQ:
+                with open(path_store_path,'w') as f:
+                    json.dump(path_pool,f)
+            #path = path_pool[shape_array_string]['path']
+            #path = oe.contract_path(*operands,optimize='random-greedy-128')[0]
+            #store[array_string]={}
+            #store[array_string]['path']=path
+            #saveQ = True
+            # path        = store[array_string]['path']
+            # if saveQ and path_store_path is not None:
+            #     with open(path_store_path,'w') as f:
+            #         json.dump(store,f)
+        path = path_pool[shape_array_string]['path']
     return path
 def get_chain_contraction(tensor):
     size   = int(tensor.shape[0])

@@ -752,11 +752,11 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         operands+= [[*outlist]]
 
         #path,info = oe.contract_path(*operands,optimize='random-greedy-128')
-        path = get_best_path_via_oe(*operands)
+        path = get_best_path_via_oe(*operands,store="models/arbitrary_shape_path_recorder.json",re_saveQ=False)
         self.path         = path
         self.sublist_list = sublist_list
         self.outlist      = outlist
-        raise
+
 
         unique_unit_list = []
         # the unique unit list is the real weight for training of the model
