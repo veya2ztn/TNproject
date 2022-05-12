@@ -30,7 +30,7 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_
                                        'drop_rate_range':[0,0.5],
                                        'grad_clip_list':[None,1,5],
                                                         })]
-#hypertuner= [Normal_Train_Default]
+hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
 #schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
 optimizers= [Optimizer_Adam.copy({"config":{"lr":0.1}})]
@@ -56,8 +56,8 @@ dmlist=[
            #                           })
            # ),
            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_1','backbone_config':{},
-           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_1',
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_full','backbone_config':{},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_full',
            })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',

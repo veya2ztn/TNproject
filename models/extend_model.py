@@ -111,26 +111,18 @@ class ArbitaryPartitionModel1(nn.Module):
         x = self.network_layer(x) #(B,16)
         return x
 
-# class scale_sigmoid(nn.Module):
-#     def __init__(self):
-#         super().__init__()
-#         self.nonlinear=  nn.Tanh()
-#     def forward(self,x):
-#         x = self.nonlinear(x)
-#         #print(f"===>{torch.std_mean(x),x.shape}")
-#         mi= len(x.shape[1:])
-#         se= x.shape[-1]
-#         coef = np.power(se,1/mi)
-#         x = x/coef
-#         return x
-#
-# def PEPS_arbitary_shape_16x9_2_Z2_symmetry(**kargs):
-#     model = PEPS_einsum_arbitrary_partition_optim(out_features=1,virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
-#                                                   symmetry="Z2_16x9",
-#                                                   label_position=(8,4),fixed_virtual_dim=5)
-#     model.weight_init(method="Expecatation_Normalization2")
-#     model.pre_activate_layer =scale_sigmoid()
-#     return model
+class scale_sigmoid(nn.Module):
+    def __init__(self,*args,**kargs):
+        super().__init__()
+        self.nonlinear=  nn.Tanh()
+    def forward(self,x):
+        x = self.nonlinear(x)
+        #print(f"===>{torch.std_mean(x),x.shape}")
+        mi= len(x.shape[1:])
+        se= x.shape[-1]
+        coef = np.power(se,1/mi)
+        x = x/coef
+        return x
 
 class scaled_Tanh(nn.Module):
     def __init__(self,coef):
@@ -178,7 +170,7 @@ class TensorNetConvND(nn.Module):
             x = x.squeeze(1)
         return x
 
-    
+
 class TensorNetConvND_Single(TensorNetConvND):
     def __init__(self,shape,offset,channels):
         super().__init__()
@@ -246,3 +238,13 @@ class PEPS_16x9_Z2_Binary_Wrapper:
 
 PEPS_16x9_Z2_Binary_CNN_0 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single)
 PEPS_16x9_Z2_Binary_CNN_1 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a)
+def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
+    model=PEPS_einsum_arbitrary_partition_optim(out_features=1,
+                                            virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_full.json",
+                                            label_position=(8,4),
+                                            symmetry="Z2_16x9",
+                                            #patch_engine=self.module,
+                                            fixed_virtual_dim=2)
+    model.weight_init(method="Expecatation_Normalization2")
+    model.pre_activate_layer =scale_sigmoid()
+    return model

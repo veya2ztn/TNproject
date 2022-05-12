@@ -687,8 +687,10 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                        symmetry=None,#"Z2_16x9",
                        seted_variation=10,
                        init_std=1e-10,
-                       solved_std=None):
+                       solved_std=None,
+                       convertPeq1=False):
         super().__init__()
+        self.convertPeq1  = convertPeq1
         self.out_features = out_features
         if isinstance(virtual_bond_dim,str):
             arbitary_shape_state_dict = torch.load(virtual_bond_dim)
@@ -799,6 +801,8 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
             shape = ranks_list[i]
             P     = len(info_per_group[i]['element'])
+            if self.convertPeq1:
+                P     = 2 if P==1 else P
             #control_mat = self.rde2D((P,*shape),0,physics_index=0,offset= 2 if i==center_group else 1)
             #bias_mat    = torch.normal(0,solved_std,(P,*shape))
             #bias_mat[control_mat.nonzero(as_tuple=True)]=0
@@ -920,6 +924,8 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
             x,y = point_idx
             batch_input= input_data[...,x,y] # B,P
+            if self.convertPeq1 and batch_input.shape[-1]==1:
+                batch_input = torch.cat([batch_input,1-batch_input],-1)
             # the correct way to follow the sprit is symmetry the weight
             # however, if there is no further processing, it is same to so contractrion than do symmetry.
             # what's more, if we use further processing, it much more convience to do symmetriy later rather than
@@ -938,7 +944,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             batch_unit = unit_engine(batch_unit)
             #print(f"{batch_unit.shape}",end='\n')
             #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
-
+            print(batch_unit.shape)
             if symmetry_indices is not None:
                 unit_sys = batch_unit
                 for symmetry_indice in symmetry_indices[1:]:
