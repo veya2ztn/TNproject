@@ -682,7 +682,7 @@ def train_for_one_task(project_config):
                     trial.set_user_attr('alpha', alpha_list)
                 else:
                     alpha = trial.suggest_categorical("alpha", project_config.train.alpha_list)
-                project_config.train.alpha = alpha
+                project_config.model.backbone_config['alpha'] = alpha
                 project_config.optuna_hparam['alpha'] = alpha
             if hasattr(project_config.train,"convertPeq1_list"):
             	convertPeq1_list = project_config.train.convertPeq1_list
@@ -691,7 +691,7 @@ def train_for_one_task(project_config):
             		trial.set_user_attr('convertPeq1', convertPeq1_list)
             	else:
             		convertPeq1 = trial.suggest_categorical("convertPeq1", project_config.train.convertPeq1_list)
-            	project_config.train.convertPeq1 = convertPeq1
+            	project_config.model.backbone_config["convertPeq1"] = convertPeq1
             	project_config.optuna_hparam['convertPeq1'] = convertPeq1
             if hasattr(project_config.train,"batch_size_list"):
             	batch_size_list = project_config.train.batch_size_list

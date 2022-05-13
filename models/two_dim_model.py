@@ -902,7 +902,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 bias_mat  /= norm
                 bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
 
-                self.unique_unit_list[i] = torch.nn.init.normal_(self.unique_unit_list[i],mean=0.0, std=np.sqrt(set_var))+ bias_mat
+                self.unique_unit_list[i] = torch.nn.Parameter(torch.nn.init.normal_(self.unique_unit_list[i],mean=0.0, std=np.sqrt(set_var))+ bias_mat)
         elif method == "normlization_to_one":
             for i in range(len(self.unique_unit_list)):
                 self.unique_unit_list[i] = self.unique_unit_list[i]/torch.norm(self.unique_unit_list[i])
