@@ -107,18 +107,7 @@ while (len(get_jobs(PROJECTFILES))>0 or args.mode == "assign")and (not fouce_bre
 
     project_config.gpu = str(args.gpu)
     if  args.mode == "test":
-        from train_base import struct_config
-        from train_base import test_GPU_memory_usage
-        now_test_model = str(project_config.model.backbone_TYPE)
-        if now_test_model in tested_model_pool:
-            print("{} already tested --> pass".format(project_config.project_name))
-            mymovefile(project_config_path,os.path.join(BACKUP_DIR,project_config_name))
-            continue
-        model,project,db=struct_config(project_config,db = db,build_model=True)
-        test_GPU_memory_usage(model,project)
-        print("============test pass!===============")
-        mymovefile(project_config_path,os.path.join(BACKUP_DIR,project_config_name))
-        tested_model_pool[now_test_model]=1
+        raise NotImplementedError
     else:
         if args.comment != "":project_config.comment = args.comment
         try:
@@ -150,10 +139,8 @@ while (len(get_jobs(PROJECTFILES))>0 or args.mode == "assign")and (not fouce_bre
 
                 if args.mode != "parallel":#<===== here is simplest run case
                     from train_base import train_for_one_task
-                    from train_base import struct_config
-                    model,project,db=struct_config(project_config,db = db,build_model=False)
-                    project.project_json_config_path=project_config_path
-                    project_root_dir=train_for_one_task(model,project)
+                    project_config.project_json_config_path = project_config_path
+                    project_root_dir=train_for_one_task(project_config)
                 else:
                     trials       = project_config.train.trials
                     random_seed   =random.randint(1, 100000)

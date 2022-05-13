@@ -98,7 +98,7 @@ def struct_dataloader(project_config,only_valid=False,verbose = True):
     DATASET_TYPE= project_config.data.dataset_TYPE
     DATASETargs = project_config.data.dataset_args
     DATANORMER  = project_config.data.dataset_norm if hasattr(project_config.data,'dataset_norm') else 'max'
-    IMAGENORM   = project_config.data.image_transfermer if hasattr(project_config.data,'image_transfermer') else None
+    IMAGENORM   = project_config.data.image_transformer if hasattr(project_config.data,'image_transformer') else None
     #FEATURENUM  = project_config.data.feature_num #20
     TRANSF_TYPE = project_config.data.transform_TYPE if hasattr(project_config.data,'transform_TYPE') else None
     TRANS_Config= project_config.data.transform_config if hasattr(project_config.data,'transform_config') else {}
@@ -109,18 +109,18 @@ def struct_dataloader(project_config,only_valid=False,verbose = True):
         assert DATANORMER == "none"
         dataset_valid= eval(f"dtst.{DATASET_TYPE}")(CURVE_TEST,IMAGE_TEST,
                                     transformer=transformer,normf=DATANORMER,
-                                    case_type='test',verbose=verbose,image_transfermer=IMAGENORM,
+                                    case_type='test',verbose=verbose,image_transformer=IMAGENORM,
                                     **DATASETargs)
 
         return dataset_valid,dataset_valid.transformer
 
     dataset_train= eval(f"dtst.{DATASET_TYPE}")(CURVETRAIN,IMAGETRAIN,
                                 transformer=transformer,normf=DATANORMER,
-                                case_type='train',verbose=verbose,image_transfermer=IMAGENORM,volume=DATA_VOLUME,
+                                case_type='train',verbose=verbose,image_transformer=IMAGENORM,volume=DATA_VOLUME,
                                 **DATASETargs)
     dataset_valid= eval(f"dtst.{DATASET_TYPE}")(CURVE_TEST,IMAGE_TEST,
                                 transformer=transformer,normf=[dataset_train.forf,dataset_train.invf],
-                                case_type='test',verbose=verbose,image_transfermer=IMAGENORM,
+                                case_type='test',verbose=verbose,image_transformer=IMAGENORM,
                                 **DATASETargs)
     if "BCE" in  project_config.model.criterion_type:
         if len(dataset_train.vector.shape)==1:
@@ -356,7 +356,17 @@ def swa_update_bn(loader, model, device=None):
         bn_module.momentum = momenta[bn_module]
     model.train(was_training)
 
-def do_train(model,project,train_loader,valid_loader,logsys,trial=False):
+def do_train(project_config,logsys,trial=False):
+    print(project_config)
+    model,project,db = struct_config(project_config,db = None ,build_model=True)
+
+    train_loader = project.train_loader
+    valid_loader = project.valid_loader
+    PROJECTNAME  = project.project_name
+    epoches      = project.train_epoches
+    project.project_json_config_path=project_config.project_json_config_path
+    project.full_config = project_config
+    project.train_mode  = project_config.train_mode
     return one_complete_train(model,project,train_loader,valid_loader,logsys,trial=trial)
 
 def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=False):
@@ -469,7 +479,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     drop_out_limit= epoches if not drop_out_limit else drop_out_limit
     bad_condition_happen = False
     if drop_rate is not None:model.set_drop_prob(drop_rate)
-    
+
     for epoch in master_bar:
         if epoch < start_epoch:continue
         ### training phase ########
@@ -565,77 +575,62 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     logsys.close()
     return metric_dict['best_'+accu_list[0]][accu_list[0]]
 
-def train_for_one_task(model,project):
-    # model,project= struct_config(project_config,db=db,build_model=False)
-    train_loader = project.train_loader
-    valid_loader = project.valid_loader
-    PROJECTNAME  = project.project_name
-    epoches      = project.train_epoches
-    project_config = project.full_config
-    print(project_config)
+def train_for_one_task(project_config):
+    train_mode  = project_config.train_mode if hasattr(project_config,"train_mode") else "new"
+    project_config.train_mode = train_mode
+    MODEL_NAME  =project_config.model.str_backbone_TYPE
+    if hasattr(project_config.model,'backbone_config') and "virtual_bond_dim" in project_config.model.backbone_config:
+        virtual_bond_dim=project_config.model.backbone_config['virtual_bond_dim']
+        if "_v" not in MODEL_NAME and virtual_bond_dim is not None:
+            MODEL_NAME += f"_v{virtual_bond_dim}"
+
+    PROJECTNAME  = project_config.project_name
+    DATASET_NAME=".".join(PROJECTNAME.split('.')[1:])
+    SAVE__DIR   = os.path.join(SAVEROOT,'checkpoints',DATASET_NAME,MODEL_NAME)
     print("-------------------------------------------------------------------------------------------")
     print("now trainning project: <|{}|>".format(PROJECTNAME))
     print("-------------------------------------------------------------")
 
-    MODEL_NAME  =project.full_config.model.str_backbone_TYPE
-    if hasattr(project.full_config.model,'backbone_config') and "virtual_bond_dim" in project.full_config.model.backbone_config:
-        virtual_bond_dim=project.full_config.model.backbone_config['virtual_bond_dim']
-        if "_v" not in MODEL_NAME and virtual_bond_dim is not None:
-            MODEL_NAME += f"_v{virtual_bond_dim}"
-
-    DATASET_NAME=".".join(PROJECTNAME.split('.')[1:])
-    DB_NAME     = project.full_config.project_task_name
-    TASK_NAME   = project.full_config.project_json_name.split(".")[0]
-    SAVE__DIR   = os.path.join(SAVEROOT,'checkpoints',DATASET_NAME,MODEL_NAME)
-    train_mode  = project_config.train_mode if hasattr(project_config,"train_mode") else "new"
-    project.train_mode=train_mode
+    print(project_config)
     if train_mode in ["new","replicate"]:
-        trial_range = range(project.trials_num)
+        trial_range = range(project_config.train.trials)
         for trial in trial_range:
             print(time.asctime( time.localtime(time.time())))
             tp.banner("Trainning processing:trial-{}".format(trial))
-            random_seed=int(project_config.random_seed) if train_mode == 'replicate' else random.randint(1, 100000)
-            TIME_NOW  = time.strftime("%m_%d_%H_%M_%S")
-            TRIAL_NOW = '{}-seed-{}'.format(TIME_NOW,random_seed)
-            save_checkpoint= os.path.join(SAVE__DIR,TRIAL_NOW)
-            logsys         = LoggingSystem(True,save_checkpoint,seed=random_seed)
-            model          = struct_model(project_config,train_loader.dataset)
+            random_seed       =random.randint(1, 100000)
+            TIME_NOW          = time.strftime("%m_%d_%H_%M_%S")
+            TRIAL_NOW         = '{}-seed-{}'.format(TIME_NOW,random_seed)
+            save_checkpoint   = os.path.join(SAVE__DIR,TRIAL_NOW)
+            logsys            = LoggingSystem(True,save_checkpoint,bar_log_path=f"runtime_log/bar_for_job_on_GPU{project_config.gpu}",seed=random_seed)
             #################################################################################
-            do_train(model,project,train_loader,valid_loader,logsys)
-            #################################################################################
-            del model
+            result = do_train(project_config,logsys)
             torch.cuda.empty_cache()
+            #################################################################################
+
             project_root_dir  = os.path.join(save_checkpoint,'project_config.json')
             shutil.copy(project.project_json_config_path,project_root_dir)
     elif train_mode == "optuna":
         import optuna
-
         def objective(trial):
-            random_seed =random.randint(1, 100000)
-            TIME_NOW    = time.strftime("%m_%d_%H_%M_%S")
-            TRIAL_NOW   = '{}-seed-{}'.format(TIME_NOW,random_seed)
-            save_checkpoint   = os.path.join(SAVE__DIR,TRIAL_NOW)
-            logsys            = LoggingSystem(True,save_checkpoint,bar_log_path=f"runtime_log/bar_for_job_on_GPU{project.full_config.gpu}",seed=random_seed)
-            if not os.path.exists(save_checkpoint):os.makedirs(save_checkpoint)
-            project_root_dir  = os.path.join(save_checkpoint,'project_config.json')
-            assert project.full_config.train.hypertuner == "optuna"
-            project.full_config.optuna_hparam={}
-            if hasattr(project.full_config.train,"drop_rate_range"):
-                drop_rate = trial.suggest_uniform(f"drop_rate", *project.full_config.train.drop_rate_range)
-                project.full_config.train.drop_rate = drop_rate
-                project.full_config.optuna_hparam['drop_rate'] = drop_rate
-            if hasattr(project.full_config.train,"optimizer_list"):
-                optimizer_list = list(project.full_config.train.optimizer_list.keys())
+            assert project_config.train.hypertuner == "optuna"
+            project_config.optuna_hparam={}
+
+            if hasattr(project_config.train,"drop_rate_range"):
+                drop_rate = trial.suggest_uniform(f"drop_rate", *project_config.train.drop_rate_range)
+                project_config.train.drop_rate = drop_rate
+                project_config.optuna_hparam['drop_rate'] = drop_rate
+            if hasattr(project_config.train,"optimizer_list"):
+                optimizer_list = list(project_config.train.optimizer_list.keys())
                 if len(optimizer_list)==1:
                     optimizer_name = optimizer_list[0]
                     trial.set_user_attr('optim', optimizer_name)
                 else:
                     optimizer_name = trial.suggest_categorical("optim", optimizer_list)
-                project.full_config.train.optimizer._TYPE_             = optimizer_name
-                project.full_config.train.optimizer.str_optimizer_TYPE = optimizer_name
-                project.full_config.optuna_hparam['optimer']           = optimizer_name
-                optimizer_config = project.full_config.train.optimizer_list[optimizer_name]
-                project.full_config.train.optimizer.config={}
+                project_config.train.optimizer._TYPE_             = optimizer_name
+                project_config.train.optimizer.str_optimizer_TYPE = optimizer_name
+                project_config.optuna_hparam['optimer']           = optimizer_name
+                optimizer_config = project_config.train.optimizer_list[optimizer_name]
+                project_config.train.optimizer.config={}
                 for name,value_list in optimizer_config.items():
                     if isinstance(value_list,list):
                         assert len(value_list)==2
@@ -645,113 +640,106 @@ def train_for_one_task(model,project):
                             sampler   = trial.suggest_loguniform if max(value_list)/min(value_list)>50 else trial.suggest_uniform
                             para_name = f"{optimizer_name}_{name}"
                             the_value = sampler(para_name, *value_list)
-                            project.full_config.train.optimizer.config[name] = the_value
-                            project.full_config.optuna_hparam[para_name] = the_value
+                            project_config.train.optimizer.config[name] = the_value
+                            project_config.optuna_hparam[para_name] = the_value
                         else:
                             para_name_0 = f"{optimizer_name}_{name}_0"
                             para_name_1 = f"{optimizer_name}_{name}_1"
                             the_value_0 = trial.suggest_uniform(para_name_0, *value_list[0]) if list_case_0 else value_list[0]
-                            project.full_config.optuna_hparam[para_name_0] = the_value_0
+                            project_config.optuna_hparam[para_name_0] = the_value_0
                             the_value_1 = trial.suggest_uniform(para_name_1, *value_list[1]) if list_case_1 else value_list[1]
-                            project.full_config.optuna_hparam[para_name_1] = the_value_1
-                            project.full_config.train.optimizer.config[name] = (the_value_0,the_value_1)
+                            project_config.optuna_hparam[para_name_1] = the_value_1
+                            project_config.train.optimizer.config[name] = (the_value_0,the_value_1)
                     else:
-                        project.full_config.train.optimizer.config[name] = value_list
-                        project.full_config.optuna_hparam[name]          = value_list
-            if hasattr(project.full_config.model,"criterion_list"):
-                criterion_list = project.full_config.model.criterion_list
+                        project_config.train.optimizer.config[name] = value_list
+                        project_config.optuna_hparam[name]          = value_list
+            if hasattr(project_config.model,"criterion_list"):
+                criterion_list = project_config.model.criterion_list
                 if len(criterion_list) == 1:
                     criterion = criterion_list[0]
                     trial.set_user_attr('crit', criterion)
                 else:
-                    criterion = trial.suggest_categorical("crit", project.full_config.model.criterion_list)
+                    criterion = trial.suggest_categorical("crit", project_config.model.criterion_list)
                 assert criterion in ["BCELossLogits","CELoss","FocalLoss1","BCELoss"]
                 # train_loader.dataset.use_classifier_loss(criterion)
                 # valid_loader.dataset.use_classifier_loss(criterion)
-                project.full_config.model.criterion_type = criterion #='FocalLoss1'
-                project.full_config.optuna_hparam['criterion'] = criterion
-                project.full_config.train.accu_list=accu_list=['ClassifierA', 'ClassifierP','ClassifierN']
-                ##################################
-                ### NITICE: for early project, we use BCELoss rather than BCELoss_withlogics.
-                # # the default target is (B,1) index vector
-                # # for different loss case this target should be convert to suitable shape
-                # if not hasattr(train_loader.dataset,"BCEvector"):
-                #     train_loader.dataset.BCEvector  =  train_loader.dataset.vector.reshape(-1,1)
-                #     valid_loader.dataset.BCEvector  =  valid_loader.dataset.vector.reshape(-1,1)
-                #     train_loader.dataset.BCEcurve_type_shape=(1,)
-                #     valid_loader.dataset.BCEcurve_type_shape=(1,)
-                # if not hasattr(train_loader.dataset,"CEvector"):
-                #     train_loader.dataset.CEcurve_type_shape=(2,)
-                #     valid_loader.dataset.CEcurve_type_shape=(2,)
-                # # if not hasattr(train_loader.dataset,"FCEvector"):
-                # #     train_loader.dataset.FCEvector=torch.zeros(train_loader.dataset.vector.shape[0], 2).scatter_(1, train_loader.dataset.vector.unsqueeze(1).long(), 1)
-                # #     valid_loader.dataset.FCEvector=torch.zeros(valid_loader.dataset.vector.shape[0], 2).scatter_(1, valid_loader.dataset.vector.unsqueeze(1).long(), 1)
-                # #     train_loader.dataset.FCEcurve_type_shape=(2,)
-                # #     valid_loader.dataset.FCEcurve_type_shape=(2,)
-                # if   criterion == "BCELoss":
-                #     train_loader.dataset.vector=train_loader.dataset.BCEvector
-                #     valid_loader.dataset.vector=valid_loader.dataset.BCEvector
-                #     train_loader.dataset.curve_type_shape=train_loader.dataset.BCEcurve_type_shape
-                #     valid_loader.dataset.curve_type_shape=valid_loader.dataset.BCEcurve_type_shape
-                #     project.full_config.train.accu_list=accu_list=['BinaryAL', 'BinaryPL','BinaryNL']
-                # elif criterion == "CELoss":
-                #     train_loader.dataset.vector=train_loader.dataset.BCEvector
-                #     valid_loader.dataset.vector=valid_loader.dataset.BCEvector
-                #     train_loader.dataset.curve_type_shape=train_loader.dataset.CEcurve_type_shape
-                #     valid_loader.dataset.curve_type_shape=valid_loader.dataset.CEcurve_type_shape
-                #     project.full_config.train.accu_list=accu_list=['OneHotError', 'OneHotP','OneHotN']
-                # elif criterion == "FocalLoss1":
-                #     train_loader.dataset.vector=train_loader.dataset.FCEvector
-                #     valid_loader.dataset.vector=valid_loader.dataset.FCEvector
-                #     train_loader.dataset.curve_type_shape=train_loader.dataset.FCEcurve_type_shape
-                #     valid_loader.dataset.curve_type_shape=valid_loader.dataset.FCEcurve_type_shape
-                #     project.full_config.train.accu_list=accu_list=['BinaryA', 'BinaryP','BinaryN']
-            #print(f"use criterion:{criterion}")
-            #print(f"use accu_list:{accu_list}")
-            if hasattr(project.full_config.train,"grad_clip_list"):
-                grad_clip_list = project.full_config.train.grad_clip_list
+                project_config.model.criterion_type = criterion #='FocalLoss1'
+                project_config.optuna_hparam['criterion'] = criterion
+                project_config.train.accu_list=accu_list=['ClassifierA', 'ClassifierP','ClassifierN']
+            if hasattr(project_config.train,"grad_clip_list"):
+                grad_clip_list = project_config.train.grad_clip_list
                 if len(grad_clip_list) == 1:
                     grad_clip = grad_clip_list[0]
                     trial.set_user_attr('g_clip', grad_clip_list)
                 else:
-                    grad_clip = trial.suggest_categorical("g_clip", project.full_config.train.grad_clip_list)
-                project.full_config.train.grad_clip = grad_clip
-                project.full_config.optuna_hparam['grad_clip'] = grad_clip
-            trial.set_user_attr('trial_name', TRIAL_NOW)
-            if os.path.exists(project.project_json_config_path):
-                config_for_this_trial=project.full_config.copy({'train_mode':"new"})
-                config_for_this_trial.save(project_root_dir)
-                #raise
-                #shutil.copy(project.project_json_config_path,project_root_dir)
-            else:
-                return -1
+                    grad_clip = trial.suggest_categorical("g_clip", project_config.train.grad_clip_list)
+                project_config.train.grad_clip = grad_clip
+                project_config.optuna_hparam['grad_clip'] = grad_clip
+            if hasattr(project_config.train,"alpha_list"):
+                alpha_list = project_config.train.alpha_list
+                if len(alpha_list) == 1:
+                    alpha = alpha_list[0]
+                    trial.set_user_attr('alpha', alpha_list)
+                else:
+                    alpha = trial.suggest_categorical("alpha", project_config.train.alpha_list)
+                project_config.train.alpha = alpha
+                project_config.optuna_hparam['alpha'] = alpha
+            if hasattr(project_config.train,"convertPeq1_list"):
+            	convertPeq1_list = project_config.train.convertPeq1_list
+            	if len(convertPeq1_list) == 1:
+            		convertPeq1 = convertPeq1_list[0]
+            		trial.set_user_attr('convertPeq1', convertPeq1_list)
+            	else:
+            		convertPeq1 = trial.suggest_categorical("convertPeq1", project_config.train.convertPeq1_list)
+            	project_config.train.convertPeq1 = convertPeq1
+            	project_config.optuna_hparam['convertPeq1'] = convertPeq1
+            if hasattr(project_config.train,"batch_size_list"):
+            	batch_size_list = project_config.train.batch_size_list
+            	if len(batch_size_list) == 1:
+            		batch_size = batch_size_list[0]
+            		trial.set_user_attr('batch_size', batch_size_list)
+            	else:
+            		batch_size = trial.suggest_categorical("batch_size", project_config.train.batch_size_list)
+            	project_config.train.batch_size = batch_size
+            	project_config.train.BATCH_SIZE = batch_size
+            	project_config.optuna_hparam['batch_size'] = batch_size
 
-            model  = struct_model(project_config,train_loader.dataset)
-            result = do_train(model,project,train_loader,valid_loader,logsys,trial=trial)
-            del model
+            random_seed       = random.randint(1, 100000)
+            TIME_NOW          = time.strftime("%m_%d_%H_%M_%S")
+            TRIAL_NOW         = '{}-seed-{}'.format(TIME_NOW,random_seed)
+            save_checkpoint   = os.path.join(SAVE__DIR,TRIAL_NOW)
+            logsys            = LoggingSystem(True,save_checkpoint,bar_log_path=f"runtime_log/bar_for_job_on_GPU{project_config.gpu}",seed=random_seed)
+            trial.set_user_attr('trial_name', TRIAL_NOW)
+
+            config_for_this_trial=project_config.copy({'train_mode':"new"})
+            config_for_this_trial.save(os.path.join(save_checkpoint,'project_config.json'))
+            config_for_this_trial.save(os.path.join(save_checkpoint,'project_config_optuna.json'))
+
+            #################################################################################
+            result = do_train(project_config,logsys,trial=trial)
             torch.cuda.empty_cache()
+            #################################################################################
+
             return result
 
+
+		########## optuna high level script  ###########
+        DB_NAME     = project_config.project_task_name
+        TASK_NAME   = project_config.project_json_name.split(".")[0]
         study = optuna.create_study(study_name=TASK_NAME, storage=f'sqlite:///optuna_database/{DB_NAME}.db',
                                         load_if_exists=True,
                                         sampler=optuna.samplers.CmaEsSampler(),
                                         pruner=optuna.pruners.MedianPruner(n_warmup_steps=28)
                                     )
-        optuna_limit_trials = project.full_config.train.optuna_limit_trials if hasattr(project.full_config.train,"optuna_limit_trials") else 30
-        if len([t.state for t in study.trials if t.state== TrialState.COMPLETE])>optuna_limit_trials:raise
+        optuna_limit_trials = project_config.train.optuna_limit_trials if hasattr(project_config.train,"optuna_limit_trials") else 30
+        if len([t.state for t in study.trials if t.state== TrialState.COMPLETE])>optuna_limit_trials:
+        	raise
         #study.optimize(objective, n_trials=50, timeout=600,pruner=optuna.pruners.MedianPruner())
-        hypertuner_config = project.full_config.train.hypertuner_config if hasattr(project.full_config.train,"hypertuner_config") else {'n_trials':3}
+        hypertuner_config = project_config.train.hypertuner_config if hasattr(project_config.train,"hypertuner_config") else {'n_trials':3}
         study.optimize(objective, **hypertuner_config)
-        del model
+
         torch.cuda.empty_cache()
         project_root_dir = None
     else:
-        save_checkpoint   = project_config.last_checkpoint
-        logsys            = LoggingSystem(True,save_checkpoint)
-        model             = struct_model(project_config,train_loader.dataset)
-        do_train(model,project,train_loader,valid_loader,logsys)
-        #################################################################################
-        del model
-        torch.cuda.empty_cache()
-        project_root_dir  = os.path.join(save_checkpoint,'project_config.json')
+        raise NotImplementedError
     return project_root_dir

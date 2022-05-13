@@ -13,14 +13,15 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                                     ],
                                      "grad_clip":None,
                                      'warm_up_epoch':20,
-                                     'epoches': 100,
+                                     'epoches': 10,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':1350,
+                                     'BATCH_SIZE':200,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':False,
-                                     'doanormaldt':True})]
+                                     'doanormaldt':True,
+                                     'optuna_limit_trials':40})]
 
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_prune':True,
                                        'optimizer_list':{
@@ -28,7 +29,10 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
                                                 },
                                        #'drop_rate_range':[0,0.5],
-                                       'grad_clip_list':[None,1,5],
+                                       #'grad_clip_list':[None,1,5],
+                                       'alpha_list':[2,3,4,5],
+                                       'convertPeq1_list':[0,1,"all_convert"],
+                                       'batch_size_list':[100,200],
                                                         })]
 #hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
@@ -47,7 +51,7 @@ train_config_list = [ConfigCombine({"base":[b,h], "scheduler":[s], "earlystop":[
                         for a in anormal_detect]
 
 MNIST_DATA_Config=Config({'dataset_TYPE':'datasets.FashionMNIST','dataset_args':{'root':DATAROOT+f"/FashionMNIST",'download':True}})
-msdataT_RDNfft   =msdataT_RDN.copy({'image_transfermer':'fft16x9_norm'})
+msdataT_RDNfft   =msdataT_RDN.copy({'image_transformer':'fft16x9_norm'})
 dmlist=[
            # (MNIST_DATA_Config,
            #  backbone_templete.copy({'backbone_TYPE':'LinearCombineModel2',
@@ -56,7 +60,7 @@ dmlist=[
            #                           })
            # ),
            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{},
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
            'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
            })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),

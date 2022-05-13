@@ -679,9 +679,9 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         return self.einsum_engine(*operands,optimize=self.path)
 
 class PEPS_einsum_arbitrary_partition_optim(TN_Base):
-    def __init__(self,out_features,
-                      virtual_bond_dim,#"models/arbitary_shape/arbitary_shape_16x9_2.json",
-                      label_position,#=(8,4),
+    def __init__(self,out_features=None,
+                      virtual_bond_dim=None,#"models/arbitary_shape/arbitary_shape_16x9_2.json",
+                      label_position=None,#=(8,4),
                        fixed_virtual_dim=None,
                        patch_engine=torch.nn.Identity,
                        symmetry=None,#"Z2_16x9",
@@ -690,6 +690,9 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                        solved_std=None,
                        convertPeq1=False):
         super().__init__()
+        assert out_features is not None
+        assert virtual_bond_dim is not None
+        assert label_position is not None
         self.convertPeq1  = convertPeq1
         self.out_features = out_features
         if isinstance(virtual_bond_dim,str):
@@ -802,7 +805,11 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             shape = ranks_list[i]
             P     = len(info_per_group[i]['element'])
             if self.convertPeq1:
-                P     = 2 if P==1 else P
+                if self.convertPeq1 == 'all_convert':
+                    P = 2*P
+                else:
+                    P     = 2 if P==1 else P
+
             #control_mat = self.rde2D((P,*shape),0,physics_index=0,offset= 2 if i==center_group else 1)
             #bias_mat    = torch.normal(0,solved_std,(P,*shape))
             #bias_mat[control_mat.nonzero(as_tuple=True)]=0
@@ -816,12 +823,12 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         center_group_unique_idx = info_per_group[center_group]["weight_idx"]
         for i,v in enumerate(unique_unit_list):
             if i == center_group_unique_idx:
-                offset = 1
+                offset = 2
                 inchan = out_features
             else:
-                offset = 0
+                offset = 1
                 inchan = 1
-            self.unique_groupwise_backend.append(patch_engine(v.shape[1:],offset,inchan))
+            self.unique_groupwise_backend.append(patch_engine(v.shape[offset:],inchan))
         for i, v in enumerate(self.unique_unit_list):self.register_parameter(f'unit_{i}', param=v)
         #put the tensor into the AD graph.
         #assert len(self.unit_list)==len(sublist_list)
@@ -924,8 +931,13 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
             x,y = point_idx
             batch_input= input_data[...,x,y] # B,P
-            if self.convertPeq1 and batch_input.shape[-1]==1:
-                batch_input = torch.cat([batch_input,1-batch_input],-1)
+            if self.convertPeq1:
+                if self.convertPeq1 == 'all_convert':
+                    batch_input = torch.cat([batch_input,1-batch_input],-1)
+                elif batch_input.shape[-1]==1: #self.convertPeq1 == 'only convert for P=1':
+                    batch_input = torch.cat([batch_input,1-batch_input],-1)
+                else:
+                    pass
             # the correct way to follow the sprit is symmetry the weight
             # however, if there is no further processing, it is same to so contractrion than do symmetry.
             # what's more, if we use further processing, it much more convience to do symmetriy later rather than

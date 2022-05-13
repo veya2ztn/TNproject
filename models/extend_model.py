@@ -170,74 +170,88 @@ class TensorNetConvND(nn.Module):
             x = x.squeeze(1)
         return x
 
+    def cal_scale(self,shape,alpha):
+        factor = np.prod(shape)
+        mi     = len(shape)
+        se     = np.prod(shape)
+        #coef = np.sqrt(np.sqrt(se/2))
+        #coef   = np.sqrt(np.sqrt(factor))
+        coef   = np.sqrt(np.power(alpha*factor,1/mi))
+        return coef
 
 class TensorNetConvND_Single(TensorNetConvND):
-    def __init__(self,shape,offset,channels):
+    def __init__(self,shape,channels,alpha=4):
         super().__init__()
-        num_dims      = len(shape) - offset
+        num_dims      = len(shape)
+        self.shape    = shape
+        self.channels = channels
         self.num_dims = num_dims
-        in_channels = out_channels = channels
+        self.alpha    = alpha
+        in_channels   = out_channels = channels
         kargs = {'kernel_size':3,
                  'stride':1,
                  'padding':1,
                 }
-        active_shape = shape[offset:]
         cnn1 = get_ConND(in_channels,out_channels,num_dims,bias=False,**kargs)
-        bn1  = nn.LayerNorm(active_shape)
+        bn1  = nn.LayerNorm(shape)
+
         self.engine = nn.Sequential(cnn1,bn1)
         self.dropout= nn.Dropout(p=0.1)
-
-        factor = np.prod(active_shape)
-        mi   = len(active_shape)
-        #coef   = np.sqrt(np.sqrt(factor))
-        coef   = np.sqrt(np.power(2*factor,1/mi))
+        coef   = self.cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
+    def __repr__(self):
+        return f"TensorNetConvND_Single(shape={self.shape},channels={self.channels},alpha={self.alpha})"
 
 class TensorNetConvND_Block_a(TensorNetConvND):
-    def __init__(self,shape,offset,channels,interchannels=4):
+    def __init__(self,shape,channels,alpha=4):
         super().__init__()
-        num_dims      = len(shape) - offset
+        num_dims      = len(shape)
+        self.shape    = shape
         self.num_dims = num_dims
-        in_channels = out_channels = channels
+        self.channels = channels
+        self.alpha    = alpha
+        in_channels   = out_channels = channels
         kargs = {'kernel_size':3,
                  'stride':1,
                  'padding':1,
                 }
-        active_shape = shape[offset:]
         cnn1 = get_ConND(  in_channels,interchannels,num_dims,bias=False,**kargs)
         cnn2 = get_ConND(interchannels,out_channels ,num_dims,bias=False,**kargs)
         relu = nn.Tanh()
-        bn1  = nn.LayerNorm(active_shape)
-        bn2  = nn.LayerNorm(active_shape)
+        bn1  = nn.LayerNorm(shape)
+        bn2  = nn.LayerNorm(shape)
         self.engine = nn.Sequential(cnn1,bn1,relu,cnn2,bn2)
         self.dropout= nn.Dropout(p=0.1)
-
-        factor = np.prod(active_shape)
-        mi   = len(active_shape)
-        #coef   = np.sqrt(np.sqrt(factor))
-        coef   = np.sqrt(np.power(2*factor,1/mi))
+        coef   = self.cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
 
+    def __repr__(self):
+        return f"TensorNetConvND_Block_a(shape={self.shape},channels={self.channels},alpha={self.alpha})"
+
 class PEPS_16x9_Z2_Binary_Wrapper:
-    def __init__(self,module,**kargs):
-        self.module   = module
+    def __init__(self,module,fixed_virtual_dim=None):
+        self.module  = module
+        self.fixed_virtual_dim = fixed_virtual_dim
         self.__name__ = f"PEPS_16x9_Z2_Binary_{module.__class__.__name__}"
 
-    def __call__(self,**kargs):
-        model=PEPS_einsum_arbitrary_partition_optim(out_features=1,
-                                                virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
-                                                label_position=(8,4),
-                                                symmetry="Z2_16x9",
-                                                patch_engine=self.module,
-                                                #fixed_virtual_dim=4
+    def __call__(self,alpha=3,**kargs):
+        module = lambda *args:self.module(*args,alpha=alpha)
+        model=PEPS_einsum_arbitrary_partition_optim(virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
+                                                    label_position=(8,4),fixed_virtual_dim=self.fixed_virtual_dim,
+                                                    symmetry="Z2_16x9",
+                                                    patch_engine=module,
+                                                    **kargs
                                                )
         model.weight_init(method="Expecatation_Normalization2")
         return model
 
-PEPS_16x9_Z2_Binary_CNN_0 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single)
-PEPS_16x9_Z2_Binary_CNN_1 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a)
+PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,fixed_virtual_dim=None)
+PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,fixed_virtual_dim=4)
+PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a,fixed_virtual_dim=None)
+
+
 def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
     model=PEPS_einsum_arbitrary_partition_optim(out_features=1,
                                             virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_full.json",
