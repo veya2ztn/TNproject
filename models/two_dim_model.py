@@ -831,7 +831,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         self.symmetry_map  =symmetry_map
         self.symmetry_map_point =symmetry_map_point
         self.pre_activate_layer = nn.Identity()
-
+        self.debugQ=False
     def generate_symmetry_map(self,symmetry,info_per_point):
         symmetry_map       = {}
         symmetry_map_point = {}
@@ -942,6 +942,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             batch_unit = self.pre_activate_layer(batch_unit)
             #print(f"{batch_unit.shape}->",end=' ')
             batch_unit = unit_engine(batch_unit)
+
             #print(f"{batch_unit.shape}",end='\n')
             #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
             #print(batch_unit.shape)
@@ -950,6 +951,9 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 for symmetry_indice in symmetry_indices[1:]:
                     unit_sys = unit_sys + batch_unit.transpose(*symmetry_indice)
                 batch_unit = unit_sys/len(symmetry_indices)
+            if self.debugQ:
+                std,mean = torch.std_mean(batch_unit)
+                print(f'patch_{i}: std:{std.item()} mean:{mean.item()}')
             _input.append(batch_unit)
         #return _input,_units
         operands=[]

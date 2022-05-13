@@ -119,7 +119,7 @@ class scale_sigmoid(nn.Module):
         x = self.nonlinear(x)
         #print(f"===>{torch.std_mean(x),x.shape}")
         mi= len(x.shape[1:])
-        se= x.shape[-1]
+        se= np.prod(x.shape[-1])
         coef = np.sqrt(np.sqrt(se/2))
         x = x/coef
         return x
@@ -188,9 +188,9 @@ class TensorNetConvND_Single(TensorNetConvND):
         self.dropout= nn.Dropout(p=0.1)
 
         factor = np.prod(active_shape)
-        mi  = 1.0/len(active_shape)
+        mi   = len(active_shape)
         #coef   = np.sqrt(np.sqrt(factor))
-        coef   = np.sqrt(np.power(factor,mi))
+        coef   = np.sqrt(np.power(2*factor,1/mi))
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
 
@@ -214,9 +214,9 @@ class TensorNetConvND_Block_a(TensorNetConvND):
         self.dropout= nn.Dropout(p=0.1)
 
         factor = np.prod(active_shape)
-        mi  = 1.0/len(active_shape)
+        mi   = len(active_shape)
         #coef   = np.sqrt(np.sqrt(factor))
-        coef   = np.sqrt(np.power(factor,mi))
+        coef   = np.sqrt(np.power(2*factor,1/mi))
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
 
