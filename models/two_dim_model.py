@@ -723,6 +723,34 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             new_order = np.argsort(unique_id)
             info_per_group[group_now]['element'] = [elements[i] for i in new_order]
 
+        # if the element in group is symmetric, for example, if (15,0) and (1,0) in the same group, then the regist weight A(#Element,D,D,D,D)
+        # should hold same symmetry along #Element dimension. That is, if we set (15,0) to the A[0](D,D,D,D) and (1,0) to the A[1](D,D,D,D),
+        # then should have A[0]==A[1]
+        for group_now,pool in info_per_group.items():
+            in_symmetry_idx     = {}
+            for idx, point in enumerate(pool['element']):
+                in_symmetry_idx[idx]= [idx]
+                for string_id in symmetry_map_point[point]:# the symmetry_map_point return string point position, for example '15-0'
+                    real_point_pos = tuple([int(s) for s in string_id.split('-')])
+                    if real_point_pos != point and real_point_pos in pool['element']: # exclude the itself, and its symmetry part in element list
+                        the_idx_for_symmetry_point_in_element=pool['element'].index(real_point_pos)
+                        in_symmetry_idx[idx].append(the_idx_for_symmetry_point_in_element)
+
+            the_symmetry_permutation=[]
+            has_symmetry_point = False
+            for idx, point in enumerate(pool['element']):
+                if len(in_symmetry_idx[idx])>1:has_symmetry_point=True
+                if len(in_symmetry_idx[idx])>2:
+                    raise NotImplezntedError("we now don't support the case that have more than 2 symmetric point in one group")
+                the_symmetry_permutation.append(in_symmetry_idx[idx][-1])
+            if has_symmetry_point:
+                pool['in_group_symmetry_permutation'] = the_symmetry_permutation
+            else:
+                pool['in_group_symmetry_permutation'] = None
+
+
+
+
         if fixed_virtual_dim is not None:
             for key in info_per_line.keys():
                 info_per_line[key]['D'] = fixed_virtual_dim
@@ -899,13 +927,17 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 norm   = np.sqrt(np.prod(bias_shape))
                 norm  *= np.sqrt(size_shape[0])
                 #print(norm)
+
                 bias_mat  /= norm
                 bias_mat   = bias_mat.repeat(*size_shape,*([1]*len(bias_shape)))
 
-                self.unique_unit_list[i] = torch.nn.Parameter(torch.nn.init.normal_(self.unique_unit_list[i],mean=0.0, std=np.sqrt(set_var))+ bias_mat)
+                with torch.no_grad():
+                    self.unique_unit_list[i] = torch.nn.init.normal_(self.unique_unit_list[i],mean=0.0, std=np.sqrt(set_var))
+                    self.unique_unit_list[i].add_(bias_mat)
         elif method == "normlization_to_one":
             for i in range(len(self.unique_unit_list)):
-                self.unique_unit_list[i] = self.unique_unit_list[i]/torch.norm(self.unique_unit_list[i])
+                with torch.no_grad():
+                    self.unique_unit_list[i].div_(torch.norm(self.unique_unit_list[i]))
         else:
             raise NotImplementedError
 
@@ -925,8 +957,10 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             pool = self.info_per_group[i]
             point_idx = np.array(pool['element']).transpose()
             #print(info_per_group[i]["weight_idx"])
-            unit = self.unique_unit_list[pool["weight_idx"]]
-            unit_engine = self.unique_groupwise_backend[pool["weight_idx"]]
+            unit             = self.unique_unit_list[pool["weight_idx"]]
+            if pool['in_group_symmetry_permutation'] is not None:
+                unit = (unit + unit[pool['in_group_symmetry_permutation']])/2
+            unit_engine      = self.unique_groupwise_backend[pool["weight_idx"]]
             symmetry_indices = pool['symmetry_indices']
 
             x,y = point_idx

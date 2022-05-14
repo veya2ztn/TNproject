@@ -163,9 +163,9 @@ class TensorNetConvND(nn.Module):
             squeeze=True
         res = x
         out = self.engine(x)
-        out+= res
+        if self.rensetQ:out+= res
         x = self.resize_layer(out)
-        x = self.dropout(x)
+        #x = self.dropout(x) # dropout at last layer would heavily destroy learning processing.
         if squeeze:
             x = x.squeeze(1)
         return x
@@ -180,13 +180,14 @@ class TensorNetConvND(nn.Module):
         return coef
 
 class TensorNetConvND_Single(TensorNetConvND):
-    def __init__(self,shape,channels,alpha=4):
+    def __init__(self,shape,channels,alpha=4,rensetQ=True):
         super().__init__()
         num_dims      = len(shape)
         self.shape    = shape
         self.channels = channels
         self.num_dims = num_dims
         self.alpha    = alpha
+        self.rensetQ  = rensetQ
         in_channels   = out_channels = channels
         kargs = {'kernel_size':3,
                  'stride':1,
@@ -194,9 +195,8 @@ class TensorNetConvND_Single(TensorNetConvND):
                 }
         cnn1 = get_ConND(in_channels,out_channels,num_dims,bias=False,**kargs)
         bn1  = nn.LayerNorm(shape)
-
         self.engine = nn.Sequential(cnn1,bn1)
-        self.dropout= nn.Dropout(p=0.1)
+        #self.dropout= nn.Dropout(p=0.1) #
         coef   = self.cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
@@ -204,25 +204,26 @@ class TensorNetConvND_Single(TensorNetConvND):
         return f"TensorNetConvND_Single(shape={self.shape},channels={self.channels},alpha={self.alpha})"
 
 class TensorNetConvND_Block_a(TensorNetConvND):
-    def __init__(self,shape,channels,alpha=4):
+    def __init__(self,shape,channels,alpha=4,rensetQ=True):
         super().__init__()
         num_dims      = len(shape)
         self.shape    = shape
         self.num_dims = num_dims
         self.channels = channels
         self.alpha    = alpha
+        self.rensetQ  = rensetQ
         in_channels   = out_channels = channels
         kargs = {'kernel_size':3,
                  'stride':1,
                  'padding':1,
                 }
+        interchannels=32
         cnn1 = get_ConND(  in_channels,interchannels,num_dims,bias=False,**kargs)
         cnn2 = get_ConND(interchannels,out_channels ,num_dims,bias=False,**kargs)
         relu = nn.Tanh()
         bn1  = nn.LayerNorm(shape)
         bn2  = nn.LayerNorm(shape)
         self.engine = nn.Sequential(cnn1,bn1,relu,cnn2,bn2)
-        self.dropout= nn.Dropout(p=0.1)
         coef   = self.cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()

@@ -60,8 +60,8 @@ dmlist=[
            #                           })
            # ),
            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
-           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
+               'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
+               'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
            })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
