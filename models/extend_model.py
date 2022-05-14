@@ -178,7 +178,6 @@ class TensorNetConvND(nn.Module):
         #coef   = np.sqrt(np.sqrt(factor))
         coef   = np.sqrt(np.power(alpha*factor,1/mi))
         return coef
-
 class TensorNetConvND_Single(TensorNetConvND):
     def __init__(self,shape,channels,alpha=4,rensetQ=True):
         super().__init__()
@@ -202,7 +201,6 @@ class TensorNetConvND_Single(TensorNetConvND):
         self.reset_parameters()
     def __repr__(self):
         return f"TensorNetConvND_Single(shape={self.shape},channels={self.channels},alpha={self.alpha})"
-
 class TensorNetConvND_Block_a(TensorNetConvND):
     def __init__(self,shape,channels,alpha=4,rensetQ=True):
         super().__init__()
@@ -231,6 +229,84 @@ class TensorNetConvND_Block_a(TensorNetConvND):
     def __repr__(self):
         return f"TensorNetConvND_Block_a(shape={self.shape},channels={self.channels},alpha={self.alpha})"
 
+class TensorAttentionU3D(torch.nn.Module):
+    def __init__(self,shape,**kargs):
+        super().__init__()
+        assert len(shape) == 3
+        D1,D2,D3 = shape
+        assert D1==D2==D3
+        self.shape  = shape
+        self.attn_1 = torch.nn.MultiheadAttention(D2*D3,1,batch_first =True)
+        self.attn_2 = torch.nn.MultiheadAttention(D1*D3,1,batch_first =True)
+        self.attn_3 = torch.nn.MultiheadAttention(D1*D2,1,batch_first =True)
+    def forward(self,a):
+        assert len(a.shape)==4
+        assert a.shape[1:]==self.shape
+        x = a.permute(0,1,2,3).flatten(-2,-1)
+        y = a.permute(0,2,3,1).flatten(-2,-1)
+        z = a.permute(0,3,1,2).flatten(-2,-1)
+        o1 =  attn_1(x,y,z)[0].reshape(-1,*self.shape).permute(0,1,2,3)
+        o2 =  attn_1(y,z,x)[0].reshape(-1,*self.shape).permute(0,3,1,2)
+        o3 =  attn_1(z,x,y)[0].reshape(-1,*self.shape).permute(0,2,3,1)
+        return (o1+o2+o3)/3
+class TensorAttentionU4D(torch.nn.Module):
+    def __init__(self,shape,**kargs):
+        super().__init__()
+        assert len(shape) == 4
+        D1,D2,D3,D4 = shape
+        assert D1==D2==D3==D4
+        self.shape  = shape
+        self.attn_1 = torch.nn.MultiheadAttention(D3*D4,1,batch_first =True)
+        self.attn_2 = torch.nn.MultiheadAttention(D2*D3,1,batch_first =True)
+        self.attn_3 = torch.nn.MultiheadAttention(D1*D2,1,batch_first =True)
+    def forward(self,a):
+        assert len(a.shape)==5
+        assert a.shape[1:]==self.shape
+        x = a.permute(0,1,2,3,4).flatten(-4,-3).flatten(-2,-1)
+        y = a.permute(0,4,1,2,3).flatten(-4,-3).flatten(-2,-1)
+        z = a.permute(0,3,4,1,2).flatten(-4,-3).flatten(-2,-1)
+        o1 =  attn_1(x,y,z)[0].reshape(*a.shape).permute(0,1,2,3,4)
+        o2 =  attn_1(y,z,x)[0].reshape(*a.shape).permute(0,2,3,4,1)
+        o3 =  attn_1(z,x,y)[0].reshape(*a.shape).permute(0,3,4,1,2)
+        return (o1+o2+o3)/3
+class TensorAttention(torch.nn.Module):
+    def __init__(self,shape,channels,alpha=4,**kargs):
+        super().__init__()
+        self.shape    = shape
+        self.channels = channels
+        self.num_dims = num_dims
+        self.alpha    = alpha
+
+        if len(shape) == 3:
+            self.engine = TensorAttentionU3D(shape,**kargs)
+        elif len(shape) == 4:
+            self.engine = TensorAttentionU4D(shape,**kargs)
+
+        self.dropout= nn.Dropout(p=0.1)
+        coef   = self.cal_scale(shape,alpha)
+        self.resize_layer=scaled_Tanh(coef)
+        self.reset_parameters()
+    def __repr__(self):
+        return f"TensorAttention(shape={self.shape},channels={self.channels},alpha={self.alpha})"
+
+    def forward(self,x):
+        reshape = False
+        if len(x.shape) == len(self.shape) + 1:
+            pass
+        elif len(x.shape) == len(self.shape) + 2:
+            B,C = x.shape[:2]
+            assert C == self.channels
+            x = x.reshape(B*C,*self.shape)
+            reshape=True
+        res = x
+        out = self.engine(x)
+        out+= res
+        x = self.resize_layer(out)
+        x = self.dropout(x)
+        if reshape:
+            x = x.reshape(B,C,*self.shape)
+        return x
+
 class PEPS_16x9_Z2_Binary_Wrapper:
     def __init__(self,module,fixed_virtual_dim=None):
         self.module  = module
@@ -252,6 +328,7 @@ PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Singl
 PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,fixed_virtual_dim=4)
 PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a,fixed_virtual_dim=None)
 
+PEPS_16x9_Z2_Binary_TA_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,fixed_virtual_dim=None)
 
 def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
     model=PEPS_einsum_arbitrary_partition_optim(out_features=1,
