@@ -591,7 +591,7 @@ def train_for_one_task(project_config):
     print("now trainning project: <|{}|>".format(PROJECTNAME))
     print("-------------------------------------------------------------")
 
-    print(project_config)
+    #print(project_config)
     if train_mode in ["new","replicate"]:
         trial_range = range(project_config.train.trials)
         for trial in trial_range:

@@ -146,6 +146,15 @@ def get_ConND(in_channels,out_channels,num_dims,bias=True,**kargs):
                       **kargs)
     return cnn
 
+def cal_scale(shape,alpha):
+    factor = np.prod(shape)
+    mi     = len(shape)
+    se     = np.prod(shape)
+    #coef = np.sqrt(np.sqrt(se/2))
+    #coef   = np.sqrt(np.sqrt(factor))
+    coef   = np.sqrt(np.power(alpha*factor,1/mi))
+    return coef
+
 class TensorNetConvND(nn.Module):
 
     def reset_parameters(self):
@@ -170,14 +179,6 @@ class TensorNetConvND(nn.Module):
             x = x.squeeze(1)
         return x
 
-    def cal_scale(self,shape,alpha):
-        factor = np.prod(shape)
-        mi     = len(shape)
-        se     = np.prod(shape)
-        #coef = np.sqrt(np.sqrt(se/2))
-        #coef   = np.sqrt(np.sqrt(factor))
-        coef   = np.sqrt(np.power(alpha*factor,1/mi))
-        return coef
 class TensorNetConvND_Single(TensorNetConvND):
     def __init__(self,shape,channels,alpha=4,rensetQ=True):
         super().__init__()
@@ -196,7 +197,7 @@ class TensorNetConvND_Single(TensorNetConvND):
         bn1  = nn.LayerNorm(shape)
         self.engine = nn.Sequential(cnn1,bn1)
         #self.dropout= nn.Dropout(p=0.1) #
-        coef   = self.cal_scale(shape,alpha)
+        coef   = cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
     def __repr__(self):
@@ -222,7 +223,7 @@ class TensorNetConvND_Block_a(TensorNetConvND):
         bn1  = nn.LayerNorm(shape)
         bn2  = nn.LayerNorm(shape)
         self.engine = nn.Sequential(cnn1,bn1,relu,cnn2,bn2)
-        coef   = self.cal_scale(shape,alpha)
+        coef   = cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
 
@@ -245,10 +246,11 @@ class TensorAttentionU3D(torch.nn.Module):
         x = a.permute(0,1,2,3).flatten(-2,-1)
         y = a.permute(0,2,3,1).flatten(-2,-1)
         z = a.permute(0,3,1,2).flatten(-2,-1)
-        o1 =  attn_1(x,y,z)[0].reshape(-1,*self.shape).permute(0,1,2,3)
-        o2 =  attn_1(y,z,x)[0].reshape(-1,*self.shape).permute(0,3,1,2)
-        o3 =  attn_1(z,x,y)[0].reshape(-1,*self.shape).permute(0,2,3,1)
+        o1 =  self.attn_1(x,y,z)[0].reshape(-1,*self.shape).permute(0,1,2,3)
+        o2 =  self.attn_1(y,z,x)[0].reshape(-1,*self.shape).permute(0,3,1,2)
+        o3 =  self.attn_1(z,x,y)[0].reshape(-1,*self.shape).permute(0,2,3,1)
         return (o1+o2+o3)/3
+
 class TensorAttentionU4D(torch.nn.Module):
     def __init__(self,shape,**kargs):
         super().__init__()
@@ -265,27 +267,27 @@ class TensorAttentionU4D(torch.nn.Module):
         x = a.permute(0,1,2,3,4).flatten(-4,-3).flatten(-2,-1)
         y = a.permute(0,4,1,2,3).flatten(-4,-3).flatten(-2,-1)
         z = a.permute(0,3,4,1,2).flatten(-4,-3).flatten(-2,-1)
-        o1 =  attn_1(x,y,z)[0].reshape(*a.shape).permute(0,1,2,3,4)
-        o2 =  attn_1(y,z,x)[0].reshape(*a.shape).permute(0,2,3,4,1)
-        o3 =  attn_1(z,x,y)[0].reshape(*a.shape).permute(0,3,4,1,2)
+        o1 =  self.attn_1(x,y,z)[0].reshape(*a.shape).permute(0,1,2,3,4)
+        o2 =  self.attn_1(y,z,x)[0].reshape(*a.shape).permute(0,2,3,4,1)
+        o3 =  self.attn_1(z,x,y)[0].reshape(*a.shape).permute(0,3,4,1,2)
         return (o1+o2+o3)/3
+
 class TensorAttention(torch.nn.Module):
     def __init__(self,shape,channels,alpha=4,**kargs):
         super().__init__()
         self.shape    = shape
         self.channels = channels
-        self.num_dims = num_dims
         self.alpha    = alpha
 
         if len(shape) == 3:
             self.engine = TensorAttentionU3D(shape,**kargs)
         elif len(shape) == 4:
             self.engine = TensorAttentionU4D(shape,**kargs)
-
-        self.dropout= nn.Dropout(p=0.1)
-        coef   = self.cal_scale(shape,alpha)
+        else:
+            raise NotImplementedErrort
+        coef   = cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
-        self.reset_parameters()
+
     def __repr__(self):
         return f"TensorAttention(shape={self.shape},channels={self.channels},alpha={self.alpha})"
 
@@ -302,20 +304,20 @@ class TensorAttention(torch.nn.Module):
         out = self.engine(x)
         out+= res
         x = self.resize_layer(out)
-        x = self.dropout(x)
         if reshape:
             x = x.reshape(B,C,*self.shape)
         return x
 
 class PEPS_16x9_Z2_Binary_Wrapper:
-    def __init__(self,module,fixed_virtual_dim=None):
+    def __init__(self,module,structure_path,fixed_virtual_dim=None):
         self.module  = module
+        self.structure_path = structure_path
         self.fixed_virtual_dim = fixed_virtual_dim
         self.__name__ = f"PEPS_16x9_Z2_Binary_{module.__class__.__name__}"
 
     def __call__(self,alpha=3,**kargs):
         module = lambda *args:self.module(*args,alpha=alpha)
-        model=PEPS_einsum_arbitrary_partition_optim(virtual_bond_dim="models/arbitary_shape/arbitary_shape_16x9_2.json",
+        model=PEPS_einsum_arbitrary_partition_optim(virtual_bond_dim=self.structure_path,
                                                     label_position=(8,4),fixed_virtual_dim=self.fixed_virtual_dim,
                                                     symmetry="Z2_16x9",
                                                     patch_engine=module,
@@ -324,11 +326,14 @@ class PEPS_16x9_Z2_Binary_Wrapper:
         model.weight_init(method="Expecatation_Normalization2")
         return model
 
-PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,fixed_virtual_dim=None)
-PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,fixed_virtual_dim=4)
-PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a,fixed_virtual_dim=None)
+PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None)
+PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4)
+PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None)
 
-PEPS_16x9_Z2_Binary_TA_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,fixed_virtual_dim=None)
+PEPS_16x9_Z2_Binary_CNN_7    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None)
+
+PEPS_16x9_Z2_Binary_TA_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=5)
+
 
 def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
     model=PEPS_einsum_arbitrary_partition_optim(out_features=1,

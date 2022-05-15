@@ -25,14 +25,16 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
 
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_prune':True,
                                        'optimizer_list':{
-                                                'Adam':{'lr':[1e-4,1e-2],  'betas':[[0.5,0.9],0.999]},
+                                                'Adam':{'lr':[1e-4,2e-3],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
                                                 },
                                        #'drop_rate_range':[0,0.5],
                                        #'grad_clip_list':[None,1,5],
-                                       'alpha_list':[2,3,4,5],
-                                       'convertPeq1_list':[0,1,"all_convert"],
-                                       'batch_size_list':[100,200],
+                                       'alpha_list':[0.01,0.02,0.03],
+                                       'convertPeq1_list':[#0,
+                                                            1,
+                                                            "all_convert"],
+                                       'batch_size_list':[100,200,300],
                                                         })]
 #hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
@@ -59,10 +61,18 @@ dmlist=[
            #                           'train_batches':1000
            #                           })
            # ),
-           [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-               'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
-               'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
-           })],
+       # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+       #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
+       #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
+       # })],
+       # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+       #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_7','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
+       #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_7',
+       # })],
+      [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+          'backbone_TYPE':'PEPS_16x9_Z2_Binary_TA_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
+          'backbone_alias':'PEPS_16x9_Z2_Binary_TA_0',
+      })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
            #                           'backbone_config':{'W':6,'H':6,'virtual_bond_dim':6,'in_physics_bond':16,'init_std': 1e-5},
