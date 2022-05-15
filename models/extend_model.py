@@ -309,13 +309,14 @@ class TensorAttention(torch.nn.Module):
         return x
 
 class PEPS_16x9_Z2_Binary_Wrapper:
-    def __init__(self,module,structure_path,fixed_virtual_dim=None):
+    def __init__(self,module,structure_path,alpha=3,fixed_virtual_dim=None):
         self.module  = module
         self.structure_path = structure_path
         self.fixed_virtual_dim = fixed_virtual_dim
         self.__name__ = f"PEPS_16x9_Z2_Binary_{module.__class__.__name__}"
-
-    def __call__(self,alpha=3,**kargs):
+        self.alpha = alpha
+    def __call__(self,alpha=None,**kargs):
+        if alpha is None:alpha = self.alpha
         module = lambda *args:self.module(*args,alpha=alpha)
         model=PEPS_einsum_arbitrary_partition_optim(virtual_bond_dim=self.structure_path,
                                                     label_position=(8,4),fixed_virtual_dim=self.fixed_virtual_dim,
@@ -326,13 +327,24 @@ class PEPS_16x9_Z2_Binary_Wrapper:
         model.weight_init(method="Expecatation_Normalization2")
         return model
 
-PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None)
-PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4)
-PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None)
+PEPS_16x9_Z2_Binary_CNNS_2    = PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None,alpha=3)
+PEPS_16x9_Z2_Binary_CNNS_2_v4 = PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4)
 
-PEPS_16x9_Z2_Binary_CNN_7    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None)
 
-PEPS_16x9_Z2_Binary_TA_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=5)
+PEPS_16x9_Z2_Binary_CNNS_3    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=None,alpha=3)
+PEPS_16x9_Z2_Binary_CNNS_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=5,alpha=2.5)
+
+PEPS_16x9_Z2_Binary_CNNS_4    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_4.json",fixed_virtual_dim=None,alpha=1.5)
+
+PEPS_16x9_Z2_Binary_CNNS_5    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=1.5)
+
+PEPS_16x9_Z2_Binary_CNNS_6    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=2.5)
+
+PEPS_16x9_Z2_Binary_CNNS_7    = PEPS_16x9_Z2_Binary_CNN_7    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None)
+
+PEPS_16x9_Z2_Binary_CNNa_2    = PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Block_a,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None,alpha=3.5)
+
+PEPS_16x9_Z2_Binary_TAT_2     = PEPS_16x9_Z2_Binary_TA_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=5,alpha=0.05)
 
 
 def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
