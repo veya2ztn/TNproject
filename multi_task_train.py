@@ -104,39 +104,29 @@ while (len(get_jobs(PROJECTFILES))>0 or args.mode == "assign")and (not fouce_bre
 
 
     project_config = read_config(project_config_path)
-
+    project_config.project_json_config_path = project_config_path
     project_config.gpu = str(args.gpu)
     if  args.mode == "test":
-        raise NotImplementedError
+        from train_base import test_GPU_memory_usage
+        now_test_model = str(project_config.model.backbone_TYPE)
+        if now_test_model in tested_model_pool:
+            print("{} already tested --> pass".format(project_config.project_name))
+            mymovefile(project_config_path,os.path.join(BACKUP_DIR,project_config_name))
+            continue
+        test_GPU_memory_usage(project_config)
+        print("============test pass!===============")
+        mymovefile(project_config_path,os.path.join(BACKUP_DIR,project_config_name))
+        tested_model_pool[now_test_model]=1
     else:
         if args.comment != "":project_config.comment = args.comment
         try:
             ### move to the running file
             if twostepassign:
-                now_file_at = os.path.join(RUNNING_DIR,project_config_name)
-                print(f"move {project_config_path} ==> {now_file_at}")
-                mymovefile(project_config_path,now_file_at)
-                project_config_path = now_file_at
+                raise NotImplementedError
             normal_train=True
             if hasattr(project_config,'PROJECT_TYPE'):
-                if project_config.PROJECT_TYPE == "GAN_PATTERN":
-                    from DCGANTRAIN import train_pattern_ga
-                    print(">>>>>>> [ we now train pattern GAN] <<<<<<<")
-                    normal_train=False
-                    train_pattern_gan(project_config)
-                elif project_config.PROJECT_TYPE == "GAN_CURVE":
-                    from DCGANCURVE import train_curve_gan
-                    print(">>>>>>> [ we now train curve GAN] <<<<<<<")
-                    train_curve_gan(project_config)
-                    normal_train=False
-                elif project_config.PROJECT_TYPE == "NAS_SEARCH":
-                    from darts_search import search_model
-                    print(">>>>>>> [ we now serach best architext] <<<<<<<")
-                    search_model(project_config)
-                    normal_train=False
+                raise NotImplementedError
             if normal_train:
-
-
                 if args.mode != "parallel":#<===== here is simplest run case
                     from train_base import train_for_one_task
                     project_config.project_json_config_path = project_config_path

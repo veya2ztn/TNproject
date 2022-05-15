@@ -13,7 +13,7 @@ from mltool import tableprint as tp
 from mltool import lr_schedulers as lr_scheduler
 from mltool import lr_schedulers as lrschdl
 from mltool import optim as optim
-
+from utils import query_gpu,linefit
 from torchvision import datasets, transforms
 
 class NanValueError(Exception):pass
@@ -743,3 +743,69 @@ def train_for_one_task(project_config):
     else:
         raise NotImplementedError
     return project_root_dir
+
+def test_GPU_memory_usage(project_config):
+    #model,project = struct_config(project_config,build_model=True,verbose=False,batch_sense=False)
+    model,project,db = struct_config(project_config,db = None ,build_model=True)
+
+    dataset_train = project.train_loader.dataset
+    dataset_valid = project.valid_loader.dataset
+    PROJECTNAME  = project.project_name
+    epoches      = project.train_epoches
+    project.project_json_config_path=project_config.project_json_config_path
+    project.full_config = project_config
+    project.train_mode  = project_config.train_mode
+
+    logsys            = LoggingSystem(False,"./test")
+
+    print("project: <|{}|>".format(PROJECTNAME))
+    criterion_str   = project.full_config.model.criterion_type if hasattr(project.full_config.model,"criterion_type") else "default"
+    model.criterion = dataset_train.criterion(criterion_str)()
+    model.optimizer = torch.optim.Adam(model.parameters(),lr=0.01)
+    model.optimizer.grad_clip = None
+    model.scheduler = None
+    #print(model)
+    memory_used_record=[]
+    headers = []
+    batches = [10,30,60,90,120,150,180,200,300]
+    # train phase
+
+    for batch in batches:
+        print(f"now test {batch} batch size")
+        if dataset_train._collate_fn is not None:# for higher version torch,  collate_fn can ==None. Not work for lower version
+            train_loader = DataLoader(dataset=dataset_train,batch_size=batch,collate_fn=dataset_train._collate_fn)
+        else:
+            train_loader = DataLoader(dataset=dataset_train,batch_size=batch)
+        try:
+            train_epoch(model,train_loader,logsys,test_mode=True)
+            memory_used = query_gpu()[0]['memory.used']
+
+            memory_used_record.append(memory_used)
+            headers.append(batch)
+            torch.cuda.empty_cache()
+        except RuntimeError:
+            traceback.print_exc()
+            break
+    if dataset_valid._collate_fn is not None:# for higher version torch,  collate_fn can ==None. Not work for lower version
+        valid_loader = DataLoader(dataset=dataset_valid,batch_size=headers[-1],collate_fn=dataset_valid._collate_fn)
+    else:
+        valid_loader = DataLoader(dataset=dataset_valid,batch_size=headers[-1])
+    accu_list   = project.full_config.train.accu_list if hasattr(project.full_config.train,'accu_list') else None
+    _ = test_epoch(model,valid_loader,logsys,accu_list = accu_list)
+
+    headers_str = [str(b) for b in headers]
+    data = np.array([memory_used_record])
+    tp.banner(PROJECTNAME)
+    tp.table(data, headers_str)
+    a,b,_ = linefit(headers,memory_used_record)
+
+    if os.path.exists(GPU_MEMORY_CONFIG_FILE):
+        with open(GPU_MEMORY_CONFIG_FILE,'r') as f:memory_record = json.load(f)
+    else:
+        memory_record = {}
+    MODEL_TYPE       = project.full_config.model.str_backbone_TYPE
+    memory_record[MODEL_TYPE]=[a,b]
+    with open(GPU_MEMORY_CONFIG_FILE,'w') as f:json.dump(memory_record,f)
+    print("拟合结果: y = %10.5f x + %10.5f " % (a,b) )
+    del model
+    torch.cuda.empty_cache()
