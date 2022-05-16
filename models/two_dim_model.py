@@ -867,6 +867,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         self.symmetry_map_point =symmetry_map_point
         self.pre_activate_layer = nn.Identity()
         self.debugQ=False
+
     def generate_symmetry_map(self,symmetry,info_per_point):
         symmetry_map       = {}
         symmetry_map_point = {}
@@ -939,9 +940,9 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 with torch.no_grad():
                     self.unique_unit_list[i].div_(torch.norm(self.unique_unit_list[i]))
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"we dont have init option:{method}")
 
-    def forward(self,input_data):
+    def forward(self,input_data, only_return_input=False):
         #input data shape B,1,W,H
         assert len(input_data.shape)==4
         assert np.prod(input_data.shape[-2:])==len(self.info_per_point)
@@ -1001,6 +1002,8 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 std,mean = torch.std_mean(batch_unit)
                 print(f'patch_{i}: std:{std.item()} mean:{mean.item()}')
             _input.append(batch_unit)
+        if only_return_input:
+            return _input
         #return _input,_units
         operands=[]
         for tensor,sublist in zip(_input,self.sublist_list):
@@ -1008,3 +1011,133 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             operands+=operand
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
+
+import copy
+class PEPS_aggregation_model(TN_Base):
+    def __init__(self,out_features=None,virtual_bond_dim=None,label_position=None,#=(8,4),
+                      fixed_virtual_dim=None,
+                       patch_engine=torch.nn.Identity,
+                       alpha_list=[],
+                       symmetry=None,#"Z2_16x9",
+                       seted_variation=10,
+                       init_std=1e-10,
+                       solved_std=None,
+                       convertPeq1=False):
+        super().__init__()
+        assert out_features is not None
+        assert virtual_bond_dim is not None
+        assert label_position is not None
+        assert isinstance(fixed_virtual_dim,int)
+        if isinstance(virtual_bond_dim,str):
+            virtual_bond_dim = torch.load(virtual_bond_dim)
+        else:
+            virtual_bond_dim = virtual_bond_dim
+        assert isinstance(virtual_bond_dim,list)
+        assert isinstance(virtual_bond_dim[0],dict)
+        self.out_features  = out_features
+        self.label_position= label_position
+        self.fixed_virtual_dim=fixed_virtual_dim
+        self.patch_engine     =patch_engine
+        self.alpha_list       =alpha_list
+        self.symmetry         =symmetry
+        self.seted_variation  =seted_variation
+        self.init_std         =init_std
+        self.solved_std       =solved_std
+        self.convertPeq1      =convertPeq1
+
+        self.modules_list  = torch.nn.ModuleList()
+
+        # if you want to use aggregation model, then all the patch config should follow the
+        # same group order, for example, group should be arranged like  group0, group1,group2
+        #                                                               group3, group4,group5
+        #                                                               .....
+        # otherwise, they won't share the optim path and won't share same _input list
+
+        ### reorder group
+        for patch_json in virtual_bond_dim:
+            info_per_point = patch_json['element']
+            info_per_group = patch_json['node']
+
+            x_max,y_max = np.array(list(info_per_point.keys())).max(0)
+            info_per_group_new = {}
+            processed_group={}
+            for i in range(x_max + 1):
+                for j in range(y_max + 1):
+                    real_group = info_per_point[i,j]['group']
+                    if real_group not in processed_group:
+                        ordered_group = len(info_per_group_new)
+                        info_per_group_new[ordered_group] = info_per_group[real_group]
+                        processed_group[real_group] = ordered_group
+                    else:
+                        ordered_group = processed_group[real_group]
+                    info_per_point[i,j]['group'] = ordered_group
+            patch_json['node'] =  info_per_group_new
+
+        self.virtual_bond_dim = virtual_bond_dim
+        if isinstance(alpha_list,int):alpha_list=[alpha_list]*len(virtual_bond_dim)
+        if len(alpha_list) ==0: alpha_list=[3]*len(virtual_bond_dim)
+        assert len(alpha_list) == len(virtual_bond_dim)
+        self.alpha_list = alpha_list
+        for alpha,virtual_bond in zip(alpha_list,virtual_bond_dim):
+            self.modules_list.append(PEPS_einsum_arbitrary_partition_optim(out_features=out_features,
+                                                                           fixed_virtual_dim=fixed_virtual_dim,
+                                                                           virtual_bond_dim = copy.deepcopy(virtual_bond),
+                                                                           label_position = label_position,
+                                                                           patch_engine   = lambda *arg:patch_engine(*arg,alpha=alpha),
+                                                                           symmetry=symmetry,
+                                                                           seted_variation=seted_variation,
+                                                                           init_std=init_std,
+                                                                           solved_std=solved_std,
+                                                                           convertPeq1=convertPeq1))
+    def weight_init(self,*args,**kargs):
+        for sub_model in self.modules_list:
+            sub_model.weight_init(*args,**kargs)
+    def forward(self,input_data,do_average=True):
+        assert len(input_data.shape)==4
+        assert np.prod(input_data.shape[-2:])==len(self.modules_list[0].info_per_point)
+        all_inputs  = [module(input_data,only_return_input=True) for module in self.modules_list]
+        all_inputs = [torch.stack([t[i] for t in all_inputs],1) for i in range(len(all_inputs[0]))]
+
+        operands=[]
+        for tensor,sublist in zip(all_inputs,self.modules_list[0].sublist_list):
+            operand = [tensor,[...,*sublist]]
+            operands+=operand
+        operands+= [[...,*self.modules_list[0].outlist]]
+        out = self.einsum_engine(*operands,optimize=self.modules_list[0].path)
+        if do_average:
+            out = out.mean(1)
+        return out
+    def get_alpha_list(self):
+        alpha_list = np.linspace(0.2,2,20)
+        for config_id,structure_config in enumerate(copy.deepcopy(self.virtual_bond_dim)):
+            std_record=[]
+            for alpha in alpha_list:
+                model=PEPS_einsum_arbitrary_partition_optim(out_features    = self.out_features,
+                                                           fixed_virtual_dim= self.fixed_virtual_dim,
+                                                           virtual_bond_dim = copy.deepcopy(structure_config),
+                                                           label_position   = self.label_position,
+                                                           patch_engine     = lambda *arg:self.patch_engine(*arg,alpha=alpha),
+                                                           symmetry         = self.symmetry,
+                                                           seted_variation  = self.seted_variation,
+                                                           init_std         = self.init_std,
+                                                           solved_std       = self.solved_std,
+                                                           convertPeq1      = self.convertPeq1
+                                                           )
+                model.weight_init(method="Expecatation_Normalization2")
+                device = 'cuda'
+                model  = model.to(device).eval()
+                with torch.no_grad():
+                    std_list = []
+                    for _ in range(10):
+                         std_list.append(torch.std(model(torch.randn(100,1,16,9).cuda())).item())
+                std_record.append(np.mean(std_list))
+            headers_str = [str(b) for b in alpha_list]
+            data = np.array([std_record])
+           #tp.table(data, headers_str)
+            x = alpha_list
+            y = std_record
+            z1 = np.polyfit(x, y, 6) #用3次多项式拟合，输出系数从高到0
+            p1 = np.poly1d(z1) #使用次数合成多项式
+            y_pre = p1(x)
+            #print("拟合结果: y = %10.5f x + %10.5f " % (a,b) )
+            print(f"id:{config_id}:best alpha {[t.real for t in np.roots(z1-2) if np.isreal(t) and t>0][0]}")
