@@ -182,9 +182,22 @@ class TN_Base(nn.Module):
             self.load_state_dict(checkpoint)
         else:
             self.load_state_dict(checkpoint['state_dict'])
-            if 'optimizer' in checkpoint and hasattr(self,'optimizer') and self.optimizer is not None:
+        if 'optimizer' in checkpoint:
+            print("we find existed optimizer checkpoint")
+            if hasattr(self,'optimizer') and self.optimizer is not None:
+                print("we load it to the self.optimizer")
                 self.optimizer.load_state_dict(checkpoint['optimizer'])
-            if 'use_focal_loss' in checkpoint:self.focal_lossQ=checkpoint['use_focal_loss']
+            else:
+                print("there is no self.optimizer,pass")
+        if 'rnd_seed' in checkpoint:
+            print("we find existed rnd_seed checkpoint")
+            print("we will load it")
+            rng_states = checkpoint['rnd_seed']
+            random.setstate(rng_states["random_state"])
+            np.random.set_state(rng_states["np_random_state"])
+            torch.set_rng_state(rng_states["torch_random_state"])
+            torch.cuda.set_rng_state_all(rng_states["torch_cuda_random_state"])
+        if 'use_focal_loss' in checkpoint:self.focal_lossQ=checkpoint['use_focal_loss']
 
     def weight_init(self):
         raise NotImplementedError
@@ -203,7 +216,7 @@ class TN_Base(nn.Module):
                 "torch_cuda_random_state": torch.cuda.get_rng_state_all(),
             }
         return checkpoint
-        
+
     def save_to(self,path):
         checkpoint=self.all_state_dict()
         torch.save(checkpoint,path)
