@@ -371,15 +371,17 @@ class PEPS_16x9_Z2_Binary_Aggregation_Wrapper:
 
 PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3 = PEPS_16x9_Z2_Binary_CNN_Aggregation = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
                                                                 "models/arbitary_shape/patch_partions_3colum_max45raw_json_list.pt", alpha_list = 1)
+PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 1)
+PEPS_16x9_Z2_Binary_CNN_Aggregation_28_3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_3column_28units.pt", alpha_list = 1)
 
-PEPS_16x9_Z2_Binary_CNN_Aggregation_25_3  = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
-                                                                "models/arbitary_shape/patch_partions_3colum_min1_max45raw_json_list.pt", alpha_list = 1)
-
-PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5  = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
-                                                                "models/arbitary_shape/patch_partions_5colum_max45raw_json_list.pt", alpha_list = 1)
-PEPS_16x9_Z2_Binary_CNN_Aggregation_25_5  = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
-                                                                "models/arbitary_shape/patch_partions_5colum_min1_max45raw_json_list.pt", alpha_list = 1)
-
+PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5 = PEPS_16x9_Z2_Binary_CNN_Aggregation = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_5colum_max45raw_json_list.pt", alpha_list = 2)
+PEPS_16x9_Z2_Binary_CNN_Aggregation_12_5 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 2)
+PEPS_16x9_Z2_Binary_CNN_Aggregation_28_5 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_5column_28units.pt", alpha_list = 2)
 
 
 def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
