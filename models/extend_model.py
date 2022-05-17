@@ -347,18 +347,40 @@ PEPS_16x9_Z2_Binary_CNNa_2    = PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Bina
 PEPS_16x9_Z2_Binary_TAT_2     = PEPS_16x9_Z2_Binary_TA_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=5,alpha=0.05)
 
 
-def PEPS_16x9_Z2_Binary_CNN_Aggregation(**kargs):
-    model=PEPS_aggregation_model(out_features=1,
-                               virtual_bond_dim="models/arbitary_shape/patch_partions_3colum_max45raw_json_list.pt",
-                               label_position=(8,4),
-                               symmetry="Z2_16x9",
-                               patch_engine=TensorNetConvND_Single,
-                               alpha_list=1,
-                               fixed_virtual_dim=5,
-                               convertPeq1=True
-                              )
-    model.weight_init(method="Expecatation_Normalization2")
-    return model
+class PEPS_16x9_Z2_Binary_Aggregation_Wrapper:
+    def __init__(self,module,structure_path,alpha_list=1,fixed_virtual_dim=5,convertPeq1=True):
+        self.module  = module
+        self.structure_path = structure_path
+        self.fixed_virtual_dim = fixed_virtual_dim
+        self.convertPeq1 = convertPeq1
+        self.__name__ = f"PEPS_16x9_Z2_Binary_{module.__class__.__name__}"
+        self.alpha_list = alpha_list
+    def __call__(self,alpha_list=None,**kargs):
+        if alpha_list is None:alpha_list = self.alpha_list
+        model=PEPS_aggregation_model(
+                                   virtual_bond_dim=self.structure_path,
+                                   label_position=(8,4),
+                                   symmetry="Z2_16x9",
+                                   patch_engine=self.module,
+                                   alpha_list=alpha_list,
+                                   fixed_virtual_dim=self.fixed_virtual_dim,
+                                   convertPeq1=self.convertPeq1,**kargs
+                                  )
+        model.weight_init(method="Expecatation_Normalization2")
+        return model
+
+PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3 = PEPS_16x9_Z2_Binary_CNN_Aggregation = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_3colum_max45raw_json_list.pt", alpha_list = 1)
+
+PEPS_16x9_Z2_Binary_CNN_Aggregation_25_3  = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_3colum_min1_max45raw_json_list.pt", alpha_list = 1)
+
+PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5  = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_5colum_max45raw_json_list.pt", alpha_list = 1)
+PEPS_16x9_Z2_Binary_CNN_Aggregation_25_5  = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+                                                                "models/arbitary_shape/patch_partions_5colum_min1_max45raw_json_list.pt", alpha_list = 1)
+
+
 
 def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
     model=PEPS_einsum_arbitrary_partition_optim(out_features=1,

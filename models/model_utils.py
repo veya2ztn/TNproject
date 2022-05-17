@@ -179,29 +179,12 @@ def full_size_array_string(*operands):
         array_string=','.join(array_string)
     return array_string
 import math
+
 def get_best_path_via_oe(*operands,store=None,re_saveQ=False):
     saveQ = False
     path_store_path = None
-    if isinstance(operands[0],str):
-        equation = operands[0]
-        tensor_l = operands[1:]
-        array_string=equation+"?"+",".join([str(tuple(t.shape)) for t in tensor_l])
-    else:
-        equation = operands[:-1]
-        tensor_l = operands[-1]
-        array_string=[]
-        for t in operands:
-            if isinstance(t,list):
-                # t is sublist
-                shape =[ l for l in t if l is not Ellipsis]
-                shape = "["+",".join([str(t) for t in shape])+"]"
-            else:
-                # t is a tensor
-                shape = list(t.shape)
-                shape = "("+",".join([str(t) for t in shape])+")"
-            array_string.append(shape)
-        array_string=','.join(array_string)
 
+    array_string = full_size_array_string(*operands)
     if store is None:
         path = oe.contract_path(*operands,optimize='random-greedy-128')[0]
     else:

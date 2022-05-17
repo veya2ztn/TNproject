@@ -678,6 +678,54 @@ class PEPS_einsum_arbitrary_shape_optim(TN_Base):
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
 
+from collections import OrderedDict
+def reorder_neighbor(patch_json):
+    #for patch_json in patch_json_list:
+    info_per_point = patch_json['element']
+    info_per_group = patch_json['node']
+    info_per_line  = patch_json['line']
+
+    x_max,y_max = np.array(list(info_per_point.keys())).max(0)
+    processed_group    ={}
+    for i in range(x_max + 1):
+        for j in range(y_max + 1):
+            real_group = info_per_point[i,j]['group']
+            if real_group not in processed_group:
+                ordered_group = len(processed_group)
+                processed_group[real_group] = ordered_group
+            else:
+                ordered_group = processed_group[real_group]
+
+    new_info_per_point ={}
+    for key,val in info_per_point.items():
+        new_val = copy.deepcopy(val)
+        new_val['group'] = processed_group[new_val['group']]
+        new_info_per_point[key]=new_val
+
+    new_info_per_group ={}
+    for key,val in info_per_group.items():
+        new_val = copy.deepcopy(val)
+        new_val['neighbor'] = [processed_group[g] for g in new_val['neighbor']]
+        new_info_per_group[key]=new_val
+
+    # we would share a same
+    #
+    new_info_per_line = {}
+    for key,val in info_per_line.items():
+        new_val = copy.deepcopy(val)
+        new_key = (processed_group[key[0]],processed_group[key[1]])
+        new_info_per_line[new_key]=new_val
+
+    new_info_per_line_order = OrderedDict()
+    for i in range(len(new_info_per_group) + 1):
+        for j in range(len(new_info_per_group) + 1):
+            if (i,j) in new_info_per_line:
+                new_info_per_line_order[i,j]=new_info_per_line[i,j]
+    return {'element':new_info_per_point,
+             'node':new_info_per_group,
+             'line':new_info_per_line_order}
+
+
 class PEPS_einsum_arbitrary_partition_optim(TN_Base):
     def __init__(self,out_features=None,
                       virtual_bond_dim=None,#"models/arbitary_shape/arbitary_shape_16x9_2.json",
@@ -705,6 +753,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         info_per_group = arbitary_shape_state_dict['node']
         info_per_line  = arbitary_shape_state_dict['line']
         info_per_point = arbitary_shape_state_dict['element']
+
 
 
         #symmetry_map = FFT_Z2_symmetry_16x9_point
@@ -748,33 +797,38 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             else:
                 pool['in_group_symmetry_permutation'] = None
 
-
-
-
         if fixed_virtual_dim is not None:
             for key in info_per_line.keys():
                 info_per_line[key]['D'] = fixed_virtual_dim
         #since we use symmetry than the center group could not in the symmetry part
         center_group = info_per_point[label_position]['group']
         damgling_num = len(info_per_group)
+
+
         info_per_group[center_group]['neighbor'].insert(0,damgling_num)
         info_per_line[(center_group,damgling_num)]={'D': out_features}
         symmetry_map[damgling_num]=set([damgling_num])
         operands = []
         sublist_list=[]
-        outlist  = [list(info_per_line.keys()).index((center_group,damgling_num))]
+
         ranks_list=[]
+
+        #absolute_line_id = {}
         for group_now in range(len(info_per_group)):
             group_info= info_per_group[group_now]
             neighbors = group_info['neighbor']
             ranks = []
             sublist=[]
+
             for neighbor_id in neighbors:
                 line_tuple = [group_now,neighbor_id]
                 line_tuple.sort()
                 line_tuple= tuple(line_tuple)
                 D = int(info_per_line[line_tuple]['D'])
+                #if line_tuple not in absolute_line_id:absolute_line_id[line_tuple] = len(absolute_line_id)
+                #idx = absolute_line_id[line_tuple]
                 idx = list(info_per_line.keys()).index(line_tuple)
+
                 ranks.append(D)
                 sublist.append(idx)
             tensor = np.random.randn(*ranks)
@@ -782,8 +836,15 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
             ranks_list.append(ranks)
             sublist_list.append(sublist)
+        outlist  = [list(info_per_line.keys()).index((center_group,damgling_num))]
+        # line_tuple = (center_group,damgling_num)
+        # #if line_tuple not in absolute_line_id:absolute_line_id[line_tuple] = len(absolute_line_id)
+        # idx = absolute_line_id[line_tuple]
+        # outlist = [idx]
         operands+= [[*outlist]]
 
+
+        self.operands_string = full_size_array_string(*operands)
         #path,info = oe.contract_path(*operands,optimize='random-greedy-128')
         path = get_best_path_via_oe(*operands,store="models/arbitrary_shape_path_recorder.json",re_saveQ=False)
         self.path         = path
@@ -1054,24 +1115,25 @@ class PEPS_aggregation_model(TN_Base):
         # otherwise, they won't share the optim path and won't share same _input list
 
         ### reorder group
-        for patch_json in virtual_bond_dim:
-            info_per_point = patch_json['element']
-            info_per_group = patch_json['node']
-
-            x_max,y_max = np.array(list(info_per_point.keys())).max(0)
-            info_per_group_new = {}
-            processed_group={}
-            for i in range(x_max + 1):
-                for j in range(y_max + 1):
-                    real_group = info_per_point[i,j]['group']
-                    if real_group not in processed_group:
-                        ordered_group = len(info_per_group_new)
-                        info_per_group_new[ordered_group] = info_per_group[real_group]
-                        processed_group[real_group] = ordered_group
-                    else:
-                        ordered_group = processed_group[real_group]
-                    info_per_point[i,j]['group'] = ordered_group
-            patch_json['node'] =  info_per_group_new
+        virtual_bond_dim = [reorder_neighbor(p) for p in virtual_bond_dim]
+        # for patch_json in virtual_bond_dim:
+        #     info_per_point = patch_json['element']
+        #     info_per_group = patch_json['node']
+        #
+        #     x_max,y_max = np.array(list(info_per_point.keys())).max(0)
+        #     info_per_group_new = {}
+        #     processed_group={}
+        #     for i in range(x_max + 1):
+        #         for j in range(y_max + 1):
+        #             real_group = info_per_point[i,j]['group']
+        #             if real_group not in processed_group:
+        #                 ordered_group = len(info_per_group_new)
+        #                 info_per_group_new[ordered_group] = info_per_group[real_group]
+        #                 processed_group[real_group] = ordered_group
+        #             else:
+        #                 ordered_group = processed_group[real_group]
+        #             info_per_point[i,j]['group'] = ordered_group
+        #     patch_json['node'] =  info_per_group_new
 
         self.virtual_bond_dim = virtual_bond_dim
         if isinstance(alpha_list,int):alpha_list=[alpha_list]*len(virtual_bond_dim)
@@ -1089,6 +1151,22 @@ class PEPS_aggregation_model(TN_Base):
                                                                            init_std=init_std,
                                                                            solved_std=solved_std,
                                                                            convertPeq1=convertPeq1))
+        path_array_string_store={}
+        for layer_id,layer in enumerate(self.modules_list):
+            if layer.operands_string not in path_array_string_store:path_array_string_store[layer.operands_string]=[]
+            path_array_string_store[layer.operands_string].append(layer_id)
+        if len(path_array_string_store)>1:
+            print("the submodel you setup have different operands path: see below:")
+            for string, layer_id_list in path_array_string_store.items():
+                print("==========================")
+                print(f"for layer {layer_id_list}, you get oprands string:")
+                print(string)
+                print("==========================")
+            # usually, the operands string for different module is different.
+            # but you will find, they actually are same since we have symmetry.
+            #raise NotImplementedError
+
+
     def weight_init(self,*args,**kargs):
         for sub_model in self.modules_list:
             sub_model.weight_init(*args,**kargs)
