@@ -24,7 +24,7 @@ parser.add_argument("--offset", default=0, type=int,help='offset num for multiTa
 args = parser.parse_args()
 if args.mode != "parallel":os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 PROJECTFILES = args.taskdir
-if len(os.listdir(PROJECTFILES)) == 0 and args.mode == 'default':
+if len(os.listdir(PROJECTFILES)) == 0 and args.mode == 'default' and not args.file:
     print("=== No project file. abort! ==")
     raise
 
@@ -50,6 +50,7 @@ if args.file:
     project_config_path = os.path.join(save_checkpoint,'project_config.json')
     project_config      = json_to_config(project_config_path)
     if args.file=="continue":
+        project_config.random_seed = int(re.findall(r"seed-([0-9]*)", save_checkpoint)[0])
         project_config.last_checkpoint = save_checkpoint
         project_config.train_mode = "contine_train"
     if args.file=="replicate":
@@ -58,7 +59,7 @@ if args.file:
         project_config.train['trials']=1
     print(project_config)
     project_name = f"{trial_num}.{project_config.project_name}"
-    project_config.save(os.path.join(f'projects/undo/{project_name}.json'))
+    project_config.save(os.path.join(f'{args.taskdir}/{project_name}.json'))
     print(f"regenerate project json file for project <{project_name}>")
     sys.exit(0)
 
@@ -122,7 +123,10 @@ while (len(get_jobs(PROJECTFILES))>0 or args.mode == "assign")and (not fouce_bre
         try:
             ### move to the running file
             if twostepassign:
-                raise NotImplementedError
+                now_file_at = os.path.join(RUNNING_DIR,project_config_name)
+                print(f"move {project_config_path} ==> {now_file_at}")
+                mymovefile(project_config_path,now_file_at)
+                project_config_path = now_file_at
             normal_train=True
             if hasattr(project_config,'PROJECT_TYPE'):
                 raise NotImplementedError

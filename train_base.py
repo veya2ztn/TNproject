@@ -624,7 +624,7 @@ def train_for_one_task(project_config):
             #################################################################################
 
             project_root_dir  = os.path.join(save_checkpoint,'project_config.json')
-            shutil.copy(project.project_json_config_path,project_root_dir)
+            shutil.copy(project_config.project_json_config_path,project_root_dir)
     elif train_mode == "optuna":
         import optuna
         def objective(trial):
@@ -762,6 +762,8 @@ def train_for_one_task(project_config):
         random_seed=int(project_config.random_seed) if hasattr(project_config,'random_seed') else random.randint(1, 100000)
         logsys            = LoggingSystem(True,save_checkpoint)
         result = do_train(project_config,logsys)
+        project_root_dir  = os.path.join(save_checkpoint,'project_config.json')
+        shutil.copy(project_config.project_json_config_path,project_root_dir)
         torch.cuda.empty_cache()
     return project_root_dir
 
