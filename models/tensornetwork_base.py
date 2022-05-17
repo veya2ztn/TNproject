@@ -188,3 +188,22 @@ class TN_Base(nn.Module):
 
     def weight_init(self):
         raise NotImplementedError
+
+    def all_state_dict(self,epoch=None,mode="light"):
+        checkpoint={}
+        checkpoint['epoch']  =  epoch
+        checkpoint['state_dict']    = self.state_dict()
+        checkpoint['use_focal_loss']= self.focal_lossQ
+        if mode != "light":
+            checkpoint['optimizer']     = self.optimizer.state_dict()
+            checkpoint['rnd_seed']     = {
+                "random_state": random.getstate(),
+                "np_random_state": np.random.get_state(),
+                "torch_random_state": torch.get_rng_state(),
+                "torch_cuda_random_state": torch.cuda.get_rng_state_all(),
+            }
+        return checkpoint
+        
+    def save_to(self,path):
+        checkpoint=self.all_state_dict()
+        torch.save(checkpoint,path)
