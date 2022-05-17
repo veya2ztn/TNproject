@@ -460,6 +460,22 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
         swa_model           = None
         swa_scheduler       = None
 
+
+    model.optimizer   = optimizer
+    if train_mode == "contine_train":
+        weight_path,start_epoch=logsys.model_saver.get_latest_model()
+        _ = model.load_from(weight_path)
+
+        metric_dict_path = os.path.join(logsys.ckpt_root,'metric_dict')
+        if os.path.exists(metric_dict_path):
+            logsys.metric_dict.load(torch.load(metric_dict_path))
+
+        routine_ckpt,best_ckpt = logsys.archive_saver(f"archive_at_{start_epoch}")
+        show_start_status = True
+        doearlystop = False
+
+
+
     FULLNAME          = args.project_json_name #
     banner            = logsys.banner_initial(epoches,FULLNAME)
     master_bar        = logsys.create_master_bar(epoches)
@@ -468,7 +484,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     logsys.valid_bar  = logsys.create_progress_bar(1,unit=' img',unit_scale=valid_loader.batch_size)
 
     model.accu_list   = accu_list
-    model.optimizer   = optimizer
+
     model.scheduler   = scheduler
     model.criterion   = criterion
     metric_dict       = logsys.metric_dict.metric_dict
@@ -741,7 +757,12 @@ def train_for_one_task(project_config):
         torch.cuda.empty_cache()
         project_root_dir = None
     else:
-        raise NotImplementedError
+        save_checkpoint   = project_config.last_checkpoint
+        if train_mode == 'contine_train' :assert hasattr(project_config,'random_seed')
+        random_seed=int(project_config.random_seed) if hasattr(project_config,'random_seed') else random.randint(1, 100000)
+        logsys            = LoggingSystem(True,save_checkpoint)
+        result = do_train(project_config,logsys)
+        torch.cuda.empty_cache()
     return project_root_dir
 
 def test_GPU_memory_usage(project_config):
