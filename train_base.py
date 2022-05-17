@@ -427,17 +427,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
                                               anormal_d_config=args.train.anormal_detect['config'],
                                               )
     start_epoch = 0
-    if train_mode == "contine_train":
-        weight_path,start_epoch=logsys.model_saver.get_latest_model()
-        _ = model.load_from(weight_path)
 
-        metric_dict_path = os.path.join(logsys.ckpt_root,'metric_dict')
-        if os.path.exists(metric_dict_path):
-            logsys.metric_dict.load(torch.load(metric_dict_path))
-
-        routine_ckpt,best_ckpt = logsys.archive_saver(f"archive_at_{start_epoch}")
-        show_start_status = True
-        doearlystop = False
 
     inference_once_only = False
     if train_mode == "show_best_performance":
@@ -460,12 +450,13 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
         swa_model           = None
         swa_scheduler       = None
 
-
     model.optimizer   = optimizer
     if train_mode == "contine_train":
+        print('we will contine_train!')
         weight_path,start_epoch=logsys.model_saver.get_latest_model()
+        print(f"load weight from {weight_path}")
         _ = model.load_from(weight_path)
-
+        print("load success")
         metric_dict_path = os.path.join(logsys.ckpt_root,'metric_dict')
         if os.path.exists(metric_dict_path):
             logsys.metric_dict.load(torch.load(metric_dict_path))
@@ -473,6 +464,8 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
         routine_ckpt,best_ckpt = logsys.archive_saver(f"archive_at_{start_epoch}")
         show_start_status = True
         doearlystop = False
+        raise
+
 
 
 
