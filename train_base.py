@@ -777,7 +777,6 @@ def test_GPU_memory_usage(project_config):
     epoches      = project.train_epoches
     project.project_json_config_path=project_config.project_json_config_path
     project.full_config = project_config
-    project.train_mode  = project_config.train_mode
 
     logsys            = LoggingSystem(False,"./test")
 
@@ -801,8 +800,7 @@ def test_GPU_memory_usage(project_config):
             train_loader = DataLoader(dataset=dataset_train,batch_size=batch)
         try:
             train_epoch(model,train_loader,logsys,test_mode=True)
-            memory_used = query_gpu()[0]['memory.used']
-
+            memory_used = float(torch.cuda.memory_stats()['reserved_bytes.all.peak'])/1024/1024
             memory_used_record.append(memory_used)
             headers.append(batch)
             torch.cuda.empty_cache()

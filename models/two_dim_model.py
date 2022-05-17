@@ -1155,13 +1155,13 @@ class PEPS_aggregation_model(TN_Base):
         for layer_id,layer in enumerate(self.modules_list):
             if layer.operands_string not in path_array_string_store:path_array_string_store[layer.operands_string]=[]
             path_array_string_store[layer.operands_string].append(layer_id)
-        if len(path_array_string_store)>1:
-            print("the submodel you setup have different operands path: see below:")
-            for string, layer_id_list in path_array_string_store.items():
-                print("==========================")
-                print(f"for layer {layer_id_list}, you get oprands string:")
-                print(string)
-                print("==========================")
+        # if len(path_array_string_store)>1:
+        #     print("the submodel you setup have different operands path: see below:")
+        #     for string, layer_id_list in path_array_string_store.items():
+        #         print("==========================")
+        #         print(f"for layer {layer_id_list}, you get oprands string:")
+        #         print(string)
+        #         print("==========================")
             # usually, the operands string for different module is different.
             # but you will find, they actually are same since we have symmetry.
             #raise NotImplementedError
