@@ -312,6 +312,9 @@ class TensorAttention(torch.nn.Module):
             x = x.reshape(B,C,*self.shape)
         return x
 
+    def set_alpha(self,alpha):
+        coef   = cal_scale(self.shape,alpha)
+        self.resize_layer=scaled_Tanh(coef)
 class PEPS_16x9_Z2_Binary_Wrapper:
     def __init__(self,module,structure_path,alpha=3,fixed_virtual_dim=None):
         self.module  = module
