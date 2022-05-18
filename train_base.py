@@ -367,6 +367,8 @@ def do_train(project_config,logsys,trial=False):
     project.project_json_config_path=project_config.project_json_config_path
     project.full_config = project_config
     project.train_mode  = project_config.train_mode
+    if hasattr(project_config.train,'use_metatrain') and project_config.train.use_metatrain:
+        return one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,trial=trial)
     return one_complete_train(model,project,train_loader,valid_loader,logsys,trial=trial)
 
 def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=False):
@@ -584,6 +586,223 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
     logsys.close()
     return metric_dict['best_'+accu_list[0]][accu_list[0]]
 
+def one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,trial=False):
+
+    logsys.regist({'task':project.project_name,'model':project.full_config.model.backbone_TYPE})
+    logsys.Q_batch_loss_record=True
+    train_mode      = project.train_mode
+    args            = project.full_config
+    if hasattr(args,'comment') and args.comment != "":
+        with open(os.path.join(logsys.ckpt_root,'README'),'w') as f:
+            f.write(args.comment)
+    show_start_status   = args.train.show_start_status
+    warm_up_epoch       = args.train.warm_up_epoch
+    valid_per_epoch     = args.train.valid_per_epoch
+    infer_epoch         = args.train.infer_epoch
+    do_inference        = args.train.do_inference
+    epoches             = args.train.epoches
+    doearlystop         = args.train.doearlystop
+    doanormaldt         = args.train.doanormaldt
+    do_extra_phase      = args.train.do_extra_phase
+    drop_rate           = args.train.drop_rate if hasattr(args.train,'drop_rate') else None
+
+    optimizer_config    = args.train.optimizer.config
+    optimizer_TYPE      = args.train.optimizer._TYPE_
+    lr = optimizer_config['lr']
+    #optimizer           = eval(f"optim.{optimizer_TYPE}")([{'params':model.parameters(),'initial_lr':lr}], **optimizer_config)
+    optimizer           = eval(f"optim.{optimizer_TYPE}")(model.parameters(), **optimizer_config)
+
+    optimizer.grad_clip = args.train.grad_clip
+
+    #criterion           = torch.nn.CrossEntropyLoss()
+    criterion_config    = args.model.criterion_config if hasattr(args.model,'criterion_config') else {}
+    #print(train_loader.dataset.criterion(args.model.criterion_type))
+    if not hasattr(args.model,'criterion_type'):
+        criterion_TYPE = torch.nn.CrossEntropyLoss
+    else:
+        if   args.model.criterion_type == 'BCEWithLogitsLoss': criterion_TYPE = torch.nn.BCEWithLogitsLoss
+        elif args.model.criterion_type == 'CELoss': criterion_TYPE = torch.nn.CrossEntropyLoss
+        else:
+            raise NotImplementedError
+    criterion     = criterion_TYPE(**criterion_config)
+
+
+
+
+    hparam_dict         = get_hparam_dict(args)
+    logsys.info(hparam_dict)
+    accu_list     = args.train.accu_list if hasattr(args.train,'accu_list') else None
+    accu_list     = train_loader.dataset.get_default_accu_type() if accu_list is None else accu_list
+
+    metric_dict   = logsys.initial_metric_dict(accu_list)
+    metric_dict   = metric_dict.metric_dict
+    _             = logsys.create_recorder(hparam_dict=hparam_dict,metric_dict=metric_dict)
+    epoches       = project.train_epoches
+    save_accu_list= accu_list[0:1] if train_mode == "optuna" else accu_list
+    _             = logsys.create_model_saver(accu_list=save_accu_list,epoches=epoches,
+                                              earlystop_config=args.train.earlystop.config,
+                                              anormal_d_config=args.train.anormal_detect['config'],
+                                              )
+    start_epoch = 0
+
+
+    inference_once_only = False
+    if train_mode == "show_best_performance":
+        weight_path=logsys.model_saver.get_best_model()
+        print(f"the best trained model at {weight_path}")
+        print("we are now going to infer the best model, so any train hyparam will be blocked")
+        _ = model.load_from(weight_path)
+        show_start_status = True
+        do_inference = True
+        inference_once_only = True
+
+    #if scheduler:scheduler.last_epoch = start_epoch - 1
+    last_epoch = start_epoch - 1
+    scheduler_config    = args.train.scheduler.config
+    scheduler_TYPE      = args.train.scheduler._TYPE_
+    scheduler           = eval(f"lrschdl.{scheduler_TYPE}")(optimizer, last_epoch=last_epoch,**scheduler_config) if args.train.scheduler._TYPE_ else None
+    if hasattr(args.train,'use_swa') and args.train.use_swa:
+        from torch.optim.swa_utils import AveragedModel, SWALR
+        print("active experiment feature: SWA")
+        swa_model           = None
+        swa_scheduler       = None
+
+    model.optimizer   = optimizer
+    if train_mode == "contine_train":
+        print('we will contine_train!')
+        weight_path,start_epoch=logsys.model_saver.get_latest_model()
+        print(f"load weight from {weight_path}")
+        _ = model.load_from(weight_path)
+        print("load success")
+        metric_dict_path = os.path.join(logsys.ckpt_root,'metric_dict')
+        if os.path.exists(metric_dict_path):
+            logsys.metric_dict.load(torch.load(metric_dict_path))
+
+        routine_ckpt,best_ckpt = logsys.archive_saver(f"archive_at_{start_epoch}")
+        show_start_status = True
+        doearlystop = False
+        raise
+
+
+
+
+    FULLNAME          = args.project_json_name #
+    banner            = logsys.banner_initial(epoches,FULLNAME)
+    master_bar        = logsys.create_master_bar(epoches)
+    logsys.banner_show(start_epoch,FULLNAME)
+    logsys.train_bar  = logsys.create_progress_bar(1,unit=' img',unit_scale=train_loader.batch_size)
+    logsys.valid_bar  = logsys.create_progress_bar(1,unit=' img',unit_scale=valid_loader.batch_size)
+
+    model.accu_list   = accu_list
+
+    model.scheduler   = scheduler
+    model.criterion   = criterion
+    metric_dict       = logsys.metric_dict.metric_dict
+
+    train_loss   = -1
+    earlystopQ   = 0  # [two mode]: Q==1 -> enterinto SGD phase
+    drop_out_limit= args.train.drop_out_limit if hasattr(args.train,'drop_out_limit') else None
+    drop_out_limit= epoches if not drop_out_limit else drop_out_limit
+    bad_condition_happen = False
+    if drop_rate is not None:model.set_drop_prob(drop_rate)
+    detail_log = True
+    for big_epoch in master_bar:
+        if big_epoch < start_epoch:continue
+        ### training phase ########
+
+        #if drop_rate is not None and hasattr(model,set_drop_prob):model.set_drop_prob(drop_rate* epoch / drop_out_limit if epoch<drop_out_limit else drop_rate)
+        # depend on will the first epoch reveal the model performance, default is will
+        if hasattr(train_loader.sampler,'set_epoch'):train_loader.sampler.set_epoch(big_epoch)
+        #train_loss,train_accu = train_epoch(model,train_loader,logsys)
+        dataloader = train_loader
+        batches    = len(dataloader)
+        device     = next(model.parameters()).device
+        prefetcher = DataSimfetcher(dataloader,device)
+        criterion  = model.criterion
+        inter_b    = logsys.create_progress_bar(batches)
+
+
+        while inter_b.update_step():
+            epoch = big_epoch*epoches + inter_b.now
+            model.train()
+            logsys.train()
+            image,label= prefetcher.next()
+            if len(image.shape)!=4:
+                temp  = image
+                image = label
+                label = temp
+            model.optimizer.zero_grad()
+
+            logit  = model(image)
+            loss   = criterion(logit,label)
+            loss.backward()
+            if hasattr(model.optimizer,"grad_clip") and (model.optimizer.grad_clip is not None):
+                nn.utils.clip_grad_norm_(model.parameters(), model.optimizer.grad_clip)
+            model.optimizer.step()
+            if model.scheduler is not None:model.scheduler.step()
+
+            loss = loss.cpu().item()
+            accu = loss#(torch.sum(torch.argmax(logit,-1) == label)/len(label)).cpu().item()
+            logsys.batch_loss_record([loss])
+            train_loss = loss
+            train_accu = accu
+            outstring="Batch:{:3}/{} loss:{:.4f} accu:{:.3f}".format(inter_b.now,batches,loss,accu)
+            inter_b.lwrite(outstring, end="\r")
+
+            if np.isnan(train_loss) or np.isnan(train_accu):raise NanValueError
+            logsys.record('the_lr_use_now', model.optimizer.param_groups[0]['lr'] , epoch)
+            logsys.record('training_loss', train_loss, epoch)
+            saveQ = not (hasattr(args.train,'turn_off_save_latest') and args.train.turn_off_save_latest)
+            bad_condition_happen = logsys.save_latest_ckpt(model,epoch,train_loss,saveQ=saveQ,doearlystop=False)
+
+            if epoch%10==0:
+                valid_acc_pool = test_epoch(model,valid_loader,logsys,accu_list=accu_list)
+                update_accu    = logsys.metric_dict.update(valid_acc_pool,epoch)
+                metric_dict    = logsys.metric_dict.metric_dict
+                for accu_type in accu_list:
+                    logsys.record(accu_type, valid_acc_pool[accu_type], epoch)
+                    logsys.record('best_'+accu_type, metric_dict['best_'+accu_type][accu_type], epoch)
+                logsys.banner_show(epoch,FULLNAME,train_losses=[train_loss])
+                earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
+
+            ### inference phase ########
+            if trial:
+                trial.report(metric_dict[accu_list[0]], epoch)
+                if trial.should_prune():
+                    if hasattr(args.train,'not_prune') and (args.train.not_prune):
+                        pass
+                    else:
+                        raise optuna.TrialPruned()
+
+            if (earlystopQ and epoch>warm_up_epoch):break
+            if bad_condition_happen:break
+
+        if (earlystopQ and epoch>warm_up_epoch):break
+        if bad_condition_happen:break
+
+
+    if inference_once_only:
+        logsys.info("========= Stop by finish inference ==============")
+    elif earlystopQ:
+        logsys.info("========= Stop by earlystop! ==============")
+    elif bad_condition_happen:
+        logsys.info("========= Stop by bad train loss condition! ==============")
+    else:
+        logsys.info("========= train finish ==============")
+
+    _ = logsys.save_latest_ckpt(model,epoch,train_loss,saveQ=True,doearlystop=False,force_do = True)
+    if len(os.listdir(logsys.model_saver.best_path))<1:
+        logsys.info("[!!!]Error: get train stoped, but no best weight saved")
+        pass
+    else:
+        logsys.info(f"we now at epoch {epoch+1}/{epoches}: get best weight:")
+        logsys.info(os.listdir(logsys.model_saver.best_path))
+    logsys.save_scalars()
+    logsys.send_info_to_hub(EXP_HUB)
+    logsys.close()
+    return metric_dict['best_'+accu_list[0]][accu_list[0]]
+
+
 def train_for_one_task(project_config):
     train_mode  = project_config.train_mode if hasattr(project_config,"train_mode") else "new"
     project_config.train_mode = train_mode
@@ -730,8 +949,6 @@ def train_for_one_task(project_config):
             #################################################################################
 
             return result
-
-
 		########## optuna high level script  ###########
         DB_NAME     = project_config.project_task_name
         TASK_NAME   = project_config.project_json_name.split(".")[0]

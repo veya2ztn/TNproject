@@ -9,18 +9,19 @@ import numpy as np
 trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                                    #'MSError_for_RDN','MSError_for_PTN','MSError_for_PLG',
                                                    #"ClassifierA","ClassifierP","ClassifierN",
-                                                   'BinaryAL','BinaryPL','BinaryNL'
+                                                   'BinaryAL','BCEWithLogitsLoss',#'BinaryNL'
                                                     ],
                                      "grad_clip":None,
                                      'warm_up_epoch':20,
                                      'epoches': 20,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':500,
+                                     'BATCH_SIZE':200,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':False,
                                      'doanormaldt':True,
+                                     'use_metatrain':True,
                                      'optuna_limit_trials':40})]
 
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_prune':True,
@@ -37,7 +38,7 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_
                                         #                    ],
                                        #'batch_size_list':[100,200,300],
                                                         })]
-#hypertuner= [Normal_Train_Default]
+hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
 #schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
 optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
@@ -62,10 +63,10 @@ dmlist=[
            #                           'train_batches':1000
            #                           })
            # ),
-       # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-       #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
-       #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
-       # })],
+       [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
+       })],
        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_7','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
        #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_7',
@@ -74,10 +75,10 @@ dmlist=[
       #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_TA_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
       #     'backbone_alias':'PEPS_16x9_Z2_Binary_TA_0',
       # })],
-      [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-          'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5','backbone_config':{"out_features":1},
-          'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5',
-      })],
+      # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+      #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5','backbone_config':{"out_features":1},
+      #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5',
+      # })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
            #                           'backbone_config':{'W':6,'H':6,'virtual_bond_dim':6,'in_physics_bond':16,'init_std': 1e-5},
