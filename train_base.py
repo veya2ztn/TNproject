@@ -1024,12 +1024,30 @@ def test_GPU_memory_usage(project_config):
     accu_list   = project.full_config.train.accu_list if hasattr(project.full_config.train,'accu_list') else None
     _ = test_epoch(model,valid_loader,logsys,accu_list = accu_list)
 
+
+
     headers_str = [str(b) for b in headers]
     data = np.array([memory_used_record])
     tp.banner(PROJECTNAME)
     tp.table(data, headers_str)
     a,b,_ = linefit(headers,memory_used_record)
 
+    # print("now we test the alpha")
+    alpha_list = np.linspace(1,5,5)
+
+    std_record=[]
+    for alpha in alpha_list:
+        model.set_alpha(alpha)
+        #model.weight_init(method="Expecatation_Normalization2")
+        model  = model.eval()
+        with torch.no_grad():
+            std_list = []
+            for _ in range(10):
+                 std_list.append(torch.std(model(torch.randn(100,1,16,9).cuda())).item())
+        std_record.append(np.mean(std_list))
+    headers_str = [str(np.round(b,1)) for b in alpha_list]
+    data = np.array([std_record])
+    tp.table(data, headers_str)
     if os.path.exists(GPU_MEMORY_CONFIG_FILE):
         with open(GPU_MEMORY_CONFIG_FILE,'r') as f:memory_record = json.load(f)
     else:

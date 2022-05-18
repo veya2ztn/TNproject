@@ -179,6 +179,10 @@ class TensorNetConvND(nn.Module):
             x = x.squeeze(1)
         return x
 
+    def set_alpha(self,alpha):
+        coef   = cal_scale(self.shape,alpha)
+        self.resize_layer=scaled_Tanh(coef)
+
 class TensorNetConvND_Single(TensorNetConvND):
     def __init__(self,shape,channels,alpha=4,rensetQ=True):
         super().__init__()
@@ -332,7 +336,10 @@ PEPS_16x9_Z2_Binary_CNNS_2_v4 = PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Bina
 
 
 PEPS_16x9_Z2_Binary_CNNS_3    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=None,alpha=3)
-PEPS_16x9_Z2_Binary_CNNS_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=5,alpha=2.5)
+PEPS_16x9_Z2_Binary_CNNS_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=5,alpha=4)
+PEPS_16x9_Z2_Binary_CNNS_3_v8 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=8,alpha=2.5)
+
+
 
 PEPS_16x9_Z2_Binary_CNNS_4    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_4.json",fixed_virtual_dim=None,alpha=1.5)
 

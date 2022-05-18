@@ -1073,6 +1073,10 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         operands+= [[...,*self.outlist]]
         return self.einsum_engine(*operands,optimize=self.path)
 
+    def set_alpha(self,alpha):
+        for backend in self.unique_groupwise_backend:
+            #if hasattr(backend,'set_alpha'):
+            backend.set_alpha(alpha)
 import copy
 class PEPS_aggregation_model(TN_Base):
     def __init__(self,out_features=None,virtual_bond_dim=None,label_position=None,#=(8,4),

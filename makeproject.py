@@ -26,7 +26,7 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
 
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_prune':True,
                                        'optimizer_list':{
-                                                'Adam':{'lr':[0.0008,0.0014],  'betas':[[0.5,0.9],0.999]},
+                                                'Adam':{'lr':[0.0001,0.01],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
                                                 },
                                        #'drop_rate_range':[0,0.5],
@@ -64,8 +64,8 @@ dmlist=[
            #                           })
            # ),
        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_2','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
-           'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_2',
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_3_v5','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_3_v5',
        })],
        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_7','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
@@ -76,8 +76,8 @@ dmlist=[
       #     'backbone_alias':'PEPS_16x9_Z2_Binary_TA_0',
       # })],
       # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-      #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5','backbone_config':{"out_features":1},
-      #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5',
+      #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3','backbone_config':{"out_features":1},
+      #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3',
       # })],
            # (MNIST_DATA_Config.copy({'crop':24,'reverse':True,'divide':4}),
            #  backbone_templete.copy({'backbone_TYPE':'PEPS_uniform_shape_symmetry_any',
