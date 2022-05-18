@@ -332,7 +332,7 @@ class PEPS_16x9_Z2_Binary_Wrapper:
         return model
 
 PEPS_16x9_Z2_Binary_CNNS_2    = PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None,alpha=3)
-PEPS_16x9_Z2_Binary_CNNS_2_v4 = PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4)
+PEPS_16x9_Z2_Binary_CNNS_2_v4 = PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4,alpha=1.1)
 
 
 PEPS_16x9_Z2_Binary_CNNS_3    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=None,alpha=3)
@@ -382,7 +382,7 @@ PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3 = PEPS_16x9_Z2_Binary_CNN_Aggregation =
 PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
                                                                 "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 1)
 PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
-                                                                "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 0.6,fixed_virtual_dim=3)                                                                
+                                                                "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 0.6,fixed_virtual_dim=3)
 PEPS_16x9_Z2_Binary_CNN_Aggregation_28_3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
                                                                 "models/arbitary_shape/patch_partions_3column_28units.pt", alpha_list = 1)
 

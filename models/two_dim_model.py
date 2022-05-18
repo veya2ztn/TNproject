@@ -1170,7 +1170,10 @@ class PEPS_aggregation_model(TN_Base):
             # but you will find, they actually are same since we have symmetry.
             #raise NotImplementedError
 
-
+    def set_alpha(self,alpha):
+        for backend in self.modules_list:
+            #if hasattr(backend,'set_alpha'):
+            backend.set_alpha(alpha)        
     def weight_init(self,*args,**kargs):
         for sub_model in self.modules_list:
             sub_model.weight_init(*args,**kargs)
