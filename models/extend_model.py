@@ -331,14 +331,14 @@ PEPS_16x9_Z2_Binary_CNNS_2    = PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Bina
 PEPS_16x9_Z2_Binary_CNNS_2_v4 = PEPS_16x9_Z2_Binary_CNN_0_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4)
 
 
-PEPS_16x9_Z2_Binary_CNNS_3    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=None,alpha=3)
-PEPS_16x9_Z2_Binary_CNNS_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=5,alpha=2.5)
+PEPS_16x9_Z2_Binary_CNNS_3    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=None,alpha=3)
+PEPS_16x9_Z2_Binary_CNNS_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=5,alpha=2.5)
 
-PEPS_16x9_Z2_Binary_CNNS_4    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_4.json",fixed_virtual_dim=None,alpha=1.5)
+PEPS_16x9_Z2_Binary_CNNS_4    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_4.json",fixed_virtual_dim=None,alpha=1.5)
 
-PEPS_16x9_Z2_Binary_CNNS_5    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=1.5)
+PEPS_16x9_Z2_Binary_CNNS_5    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=1.5)
 
-PEPS_16x9_Z2_Binary_CNNS_6    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=2.5)
+PEPS_16x9_Z2_Binary_CNNS_6    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=2.5)
 
 PEPS_16x9_Z2_Binary_CNNS_7    = PEPS_16x9_Z2_Binary_CNN_7    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None)
 

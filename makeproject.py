@@ -16,7 +16,7 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                      'epoches': 20,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':200,
+                                     'BATCH_SIZE':400,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':False,
@@ -38,7 +38,7 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_
                                         #                    ],
                                        #'batch_size_list':[100,200,300],
                                                         })]
-hypertuner= [Normal_Train_Default]
+#hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
 #schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
 optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
@@ -64,8 +64,8 @@ dmlist=[
            #                           })
            # ),
        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_0','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
-           'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_0',
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_2','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_2',
        })],
        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_7','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},
