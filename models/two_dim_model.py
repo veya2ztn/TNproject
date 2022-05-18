@@ -1140,7 +1140,7 @@ class PEPS_aggregation_model(TN_Base):
         #     patch_json['node'] =  info_per_group_new
 
         self.virtual_bond_dim = virtual_bond_dim
-        if isinstance(alpha_list,int):alpha_list=[alpha_list]*len(virtual_bond_dim)
+        if isinstance(alpha_list,int) or isinstance(alpha_list,float): alpha_list=[alpha_list]*len(virtual_bond_dim)
         if len(alpha_list) ==0: alpha_list=[3]*len(virtual_bond_dim)
         assert len(alpha_list) == len(virtual_bond_dim)
         self.alpha_list = alpha_list
