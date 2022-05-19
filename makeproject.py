@@ -64,47 +64,48 @@ dmlist=[
            #                           'train_batches':1000
            #                           })
            # ),
-        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_13_v4','backbone_config':{"out_features":2},
-            'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_13_v4_CE',
-        })],
-        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_3_v4','backbone_config':{"out_features":2},
-            'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_3_v4_CE','valid_batch':3000
-        })],
-        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_2_v4','backbone_config':{"out_features":2},
-            'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_2_v4_CE','valid_batch':3000
-        })],
+        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
+        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_13_v4','backbone_config':{"out_features":2},
+        #     'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_13_v4_CE',
+        # })],
+        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
+        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_3_v4','backbone_config':{"out_features":2},
+        #     'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_3_v4_CE','valid_batch':3000
+        # })],
+        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
+        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_2_v4','backbone_config':{"out_features":2},
+        #     'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_2_v4_CE','valid_batch':3000
+        # })],
+        #
+        #
+        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
+        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_2_v4','backbone_config':{"out_features":2},
+        #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_2_v4_CE','valid_batch':3000
+        # })],
+        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
+        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_13_v4','backbone_config':{"out_features":2},
+        #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_13_v4_CE','valid_batch':3000
+        # })],
+
+            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+            'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3_v3','backbone_config':{"out_features":1},
+            'backbone_alias':'PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3_v3','valid_batch':3000
+            })],
 
 
-        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_2_v4','backbone_config':{"out_features":2},
-            'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_2_v4_CE','valid_batch':3000
-        })],
-        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_13_v4','backbone_config':{"out_features":2},
-            'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_13_v4_CE','valid_batch':3000
-        })],
+            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+            'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_2_v4','backbone_config':{"out_features":1},
+            'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_2_v4','valid_batch':3000
+            })],
 
-            # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            # 'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_13_v4','backbone_config':{"out_features":1},
-            # 'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_13_v4','valid_batch':3000
-            # })],
-            # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            # 'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_2_v4','backbone_config':{"out_features":1},
-            # 'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_2_v4','valid_batch':3000
-            # })],
-            #
-            #
-            # [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            # 'backbone_TYPE':'PEPS_16x16_Z2_Binary_CNN_6x6_0_v4','backbone_config':{"out_features":1},
-            # 'backbone_alias':'PEPS_16x16_Z2_Binary_CNN_6x6_0_v4','valid_batch':3000
-            # })],
-            # [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            #  'backbone_TYPE':'PEPS_16x16_Z2_Binary_CNN_8x8_0_v4','backbone_config':{"out_features":1},
-            #  'backbone_alias':'PEPS_16x16_Z2_Binary_CNN_8x8_0_v4','valid_batch':3000
-            # })],
+            [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+            'backbone_TYPE':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','backbone_config':{"out_features":1},
+            'backbone_alias':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','valid_batch':3000
+            })],
+            [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+             'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_8x8_0_v4','backbone_config':{"out_features":1},
+             'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_8x8_0_v4','valid_batch':3000
+            })],
             # [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
             #   'backbone_TYPE':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','backbone_config':{"out_features":1},
             #   'backbone_alias':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','valid_batch':3000
