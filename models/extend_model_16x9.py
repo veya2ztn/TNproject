@@ -129,10 +129,17 @@ PEPS_16x9_Z2_Binary_TAT_Aggregation_28_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wr
 
 PEPS_16x9_Z2_Binary_TAT_Aggregation_19_5    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,
                                                                 "models/arbitary_shape/patch_partions_5colum_max45raw_json_list.pt", alpha_list = 1)
-PEPS_16x9_Z2_Binary_TAT_Aggregation_19_5_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,
+PEPS_16x9_Z2_Binary_TAT_Aggregation_19_5_v2 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=4940,paras=114896
+                                                                "models/arbitary_shape/patch_partions_5colum_max45raw_json_list.pt", alpha_list = 0.1,fixed_virtual_dim=2)
+PEPS_16x9_Z2_Binary_TAT_Aggregation_19_5_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=4940,paras=519075
                                                                 "models/arbitary_shape/patch_partions_5colum_max45raw_json_list.pt", alpha_list = 1,fixed_virtual_dim=3)
 PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,
-                                                                "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 2)
+                                                                "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 0.1)
+PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v2 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=3120,paras=71456
+                                                                "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 0.1,fixed_virtual_dim=2)
+PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=3120,paras=322758
+                                                                "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 0.1,fixed_virtual_dim=3)
+
 PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,
                                                                 "models/arbitary_shape/patch_partions_5column_28units.pt", alpha_list = 2)
 
