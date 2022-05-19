@@ -166,7 +166,7 @@ def struct_config(project_config,db = None,build_model=True,verbose=True):
 
     #train_loader = DataLoaderX(dataset=db.dataset_train,num_workers=1,batch_size=BATCH_SIZE,pin_memory=True,shuffle=True,collate_fn=db.dataset_train._collate)
     train_loader = DataLoader(dataset=db.dataset_train,batch_size=BATCH_SIZE,pin_memory=True,shuffle=True)
-    valid_loader = DataLoader(dataset=db.dataset_valid,batch_size=BATCH_SIZE)
+    valid_loader = DataLoader(dataset=db.dataset_valid,batch_size=project_config.model.valid_batch if hasattr(project_config.model,'valid_batch') else BATCH_SIZE)
     project = Project()
 
     project.trials_num   = TRIALS
@@ -249,7 +249,7 @@ def train_epoch_normal(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode
         model.optimizer.zero_grad()
 
         logit  = model(image)
-        label  = label.squeeze() if len(logit.shape) == 1 else label
+        logit  = logit.unsqueeze(1) if len(logit.shape) == 1 else logit
         label  = label.long() if logit.shape[-1]>1 else label
         loss   = criterion(logit,label)
         loss.backward()
@@ -289,7 +289,7 @@ def test_epoch(model,dataloader,logsys,accu_list=None,Fethcher=DataSimfetcher,in
                 label = temp
 
             logit  = model(image)
-            label  = label.squeeze() if len(logit.shape) == 1 else label
+            logit  = logit.unsqueeze(1) if len(logit.shape) == 1 else logit
             label  = label.long() if logit.shape[-1]>1 else label
             #logit  = logit.squeeze()
             labels.append(label)
@@ -690,9 +690,9 @@ def one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,t
 
 
 
-
+    total_epoches     = len(train_loader)*epoches
     FULLNAME          = args.project_json_name #
-    banner            = logsys.banner_initial(epoches,FULLNAME)
+    banner            = logsys.banner_initial(total_epoches,FULLNAME)
     master_bar        = logsys.create_master_bar(epoches)
     logsys.banner_show(start_epoch,FULLNAME)
     logsys.train_bar  = logsys.create_progress_bar(1,unit=' img',unit_scale=train_loader.batch_size)
@@ -740,7 +740,7 @@ def one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,t
 
 
             logit  = model(image)
-            label  = label.squeeze() if len(logit.shape) == 1 else label
+            logit  = logit.unsqueeze(1) if len(logit.shape) == 1 else logit
             label  = label.long() if logit.shape[-1]>1 else label
             loss   = criterion(logit,label)
             loss.backward()
@@ -803,7 +803,7 @@ def one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,t
         logsys.info("[!!!]Error: get train stoped, but no best weight saved")
         pass
     else:
-        logsys.info(f"we now at epoch {epoch+1}/{epoches}: get best weight:")
+        logsys.info(f"we now at epoch {epoch+1}/{total_epoches}: get best weight:")
         logsys.info(os.listdir(logsys.model_saver.best_path))
     logsys.save_scalars()
     logsys.send_info_to_hub(EXP_HUB)
@@ -1026,10 +1026,12 @@ def test_GPU_memory_usage(project_config):
         except RuntimeError:
             traceback.print_exc()
             break
-    if dataset_valid._collate_fn is not None:# for higher version torch,  collate_fn can ==None. Not work for lower version
-        valid_loader = DataLoader(dataset=dataset_valid,batch_size=headers[-1],collate_fn=dataset_valid._collate_fn)
-    else:
+    try:
+        valid_loader = DataLoader(dataset=dataset_valid,batch_size=3000)
+        print("can use full batch 3000 as valid batch")
+    except:
         valid_loader = DataLoader(dataset=dataset_valid,batch_size=headers[-1])
+        print("can not use full batch 3000 as valid batch")
     accu_list   = project.full_config.train.accu_list if hasattr(project.full_config.train,'accu_list') else None
     _ = test_epoch(model,valid_loader,logsys,accu_list = accu_list)
 
@@ -1057,7 +1059,7 @@ def test_GPU_memory_usage(project_config):
     # headers_str = [str(np.round(b,1)) for b in alpha_list]
     # data = np.array([std_record])
     #tp.table(data, headers_str)
-    
+
     if os.path.exists(GPU_MEMORY_CONFIG_FILE):
         with open(GPU_MEMORY_CONFIG_FILE,'r') as f:memory_record = json.load(f)
     else:
