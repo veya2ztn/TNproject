@@ -801,13 +801,14 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             for key in info_per_line.keys():
                 info_per_line[key]['D'] = fixed_virtual_dim
         #since we use symmetry than the center group could not in the symmetry part
-        center_group = info_per_point[label_position]['group']
-        damgling_num = len(info_per_group)
+        center_group = None
+        if label_position != 'no_center':
+            center_group = info_per_point[label_position]['group']
+            damgling_num = len(info_per_group)
+            info_per_group[center_group]['neighbor'].insert(0,damgling_num)
+            info_per_line[(center_group,damgling_num)]={'D': out_features}
+            symmetry_map[damgling_num]=set([damgling_num])
 
-
-        info_per_group[center_group]['neighbor'].insert(0,damgling_num)
-        info_per_line[(center_group,damgling_num)]={'D': out_features}
-        symmetry_map[damgling_num]=set([damgling_num])
         operands = []
         sublist_list=[]
 
@@ -836,7 +837,10 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
             ranks_list.append(ranks)
             sublist_list.append(sublist)
-        outlist  = [list(info_per_line.keys()).index((center_group,damgling_num))]
+        if center_group is not None:
+            outlist  = [list(info_per_line.keys()).index((center_group,damgling_num))]
+        else:
+            outlist  = []
         # line_tuple = (center_group,damgling_num)
         # #if line_tuple not in absolute_line_id:absolute_line_id[line_tuple] = len(absolute_line_id)
         # idx = absolute_line_id[line_tuple]
@@ -909,7 +913,10 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
         self.unique_unit_list         = [nn.Parameter(v) for v in unique_unit_list]
         self.unique_groupwise_backend = nn.ModuleList()
-        center_group_unique_idx = info_per_group[center_group]["weight_idx"]
+        if center_group is not None:
+            center_group_unique_idx = info_per_group[center_group]["weight_idx"]
+        else:
+            center_group_unique_idx = "-1"
         for i,v in enumerate(unique_unit_list):
             if i == center_group_unique_idx:
                 offset = 2
@@ -941,9 +948,20 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 for i in list(range(1,8))+list(range(9,16)):
                     for j in range(9):
                         group_now  = info_per_point[i,j]['group']
-                        group_sym  = info_per_point[16-i,j]['group']
-                        symmetry_map[group_now]=symmetry_map[group_now]|set([group_sym])
-                        symmetry_map_point[i,j]=symmetry_map_point[i,j]|set([f"{16-i}-{j}"])
+                        for x, y in [[16-i,j]]:
+                            group_sym  = info_per_point[x,y]['group']
+                            symmetry_map[group_now]=symmetry_map[group_now]|set([group_sym])
+                            symmetry_map_point[i,j]=symmetry_map_point[i,j]|set([f"{x}-{y}"])
+            elif symmetry == "Z2_16x16":
+                for i in range(16):
+                    for j in range(16):
+                        group_now  = info_per_point[i,j]['group']
+
+                        for x, y in [[i,15-j],[15-i,j],[15-i,15-j]]:
+                            group_sym  = info_per_point[x,y]['group']
+                            symmetry_map[group_now]=symmetry_map[group_now]|set([group_sym])
+                            symmetry_map_point[i,j]=symmetry_map_point[i,j]|set([f"{x}-{y}"])
+
             else:
                 raise NotImplementedError
         return symmetry_map,symmetry_map_point
@@ -1038,11 +1056,11 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             # however, if there is no further processing, it is same to so contractrion than do symmetry.
             # what's more, if we use further processing, it much more convience to do symmetriy later rather than
             # create a symmetric further processing for symmetric weight.
-            #if symmetry_indices is not None:
-            #    unit_sys = unit
-            #    for symmetry_indice in symmetry_indices[1:]:
-            #        unit_sys = unit_sys + unit.transpose(*symmetry_indice)
-            #    unit = unit_sys/len(symmetry_indices)
+            if symmetry_indices is not None:
+                unit_sys = unit
+                for symmetry_indice in symmetry_indices[1:]:
+                    unit_sys = unit_sys + unit.transpose(*symmetry_indice)
+                unit = unit_sys/len(symmetry_indices)
             #_units.append(unit)
             #_input.append(batch_input)
 
@@ -1051,9 +1069,10 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             #print(f"{batch_unit.shape}->",end=' ')
             batch_unit = unit_engine(batch_unit)
 
-            #print(f"{batch_unit.shape}",end='\n')
-            #print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
-            #print(batch_unit.shape)
+            ##print(f"{batch_unit.shape}",end='\n')
+            ##print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
+            ##print(batch_unit.shape)
+
             if symmetry_indices is not None:
                 unit_sys = batch_unit
                 for symmetry_indice in symmetry_indices[1:]:
@@ -1077,6 +1096,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         for backend in self.unique_groupwise_backend:
             #if hasattr(backend,'set_alpha'):
             backend.set_alpha(alpha)
+
 import copy
 class PEPS_aggregation_model(TN_Base):
     def __init__(self,out_features=None,virtual_bond_dim=None,label_position=None,#=(8,4),
@@ -1173,7 +1193,7 @@ class PEPS_aggregation_model(TN_Base):
     def set_alpha(self,alpha):
         for backend in self.modules_list:
             #if hasattr(backend,'set_alpha'):
-            backend.set_alpha(alpha)        
+            backend.set_alpha(alpha)
     def weight_init(self,*args,**kargs):
         for sub_model in self.modules_list:
             sub_model.weight_init(*args,**kargs)
