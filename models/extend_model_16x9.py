@@ -71,11 +71,11 @@ PEPS_16x9_Z2_Binary_CNNA_2    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Bloc
 # compate for old model name
 PEPS_16x9_Z2_Binary_CNN_1    = PEPS_16x9_Z2_Binary_CNNA_2
 
-PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1064,paras=691885
+PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1064,paras= 691885
                                                                 "models/arbitary_shape/patch_partions_3colum_max45raw_json_list.pt", alpha_list = 1)
-PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=672,paras=410730
+PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops= 672,paras= 410730
                                                                 "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 1)
-PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=672,paras=68850
+PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops= 672,paras=  68850
                                                                 "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 0.6,fixed_virtual_dim=3)
 PEPS_16x9_Z2_Binary_CNN_Aggregation_28_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1568,paras=1019620
                                                                 "models/arbitary_shape/patch_partions_3column_28units.pt", alpha_list = 1)
@@ -91,28 +91,30 @@ PEPS_16x9_Z2_Binary_CNN_Aggregation = PEPS_16x9_Z2_Binary_CNN_Aggregation_19_3
 PEPS_16x9_Z2_Binary_TAT_2     = PEPS_16x9_Z2_Binary_TA_0    = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,"models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=5,alpha=0.05)
 
 
-PEPS_16x9_Z2_Binary_TAT_2_v3 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras=26217
+PEPS_16x9_Z2_Binary_TAT_2_v3 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras= 26217
                                                           "models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=3,alpha=0.1)
-PEPS_16x9_Z2_Binary_TAT_2_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras=79104
+PEPS_16x9_Z2_Binary_TAT_2_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras= 79104
                                                           "models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4,alpha=0.05)
-PEPS_16x9_Z2_Binary_TAT_3_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=325,paras=95424
+PEPS_16x9_Z2_Binary_TAT_3_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=325,paras= 95424
                                                           "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=3,alpha=0.06)
 PEPS_16x9_Z2_Binary_TAT_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=325,paras=227625
                                                           "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=4,alpha=0.02)
-PEPS_16x9_Z2_Binary_TAT_4_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=156,paras=50688
+PEPS_16x9_Z2_Binary_TAT_4_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=156,paras= 50688
                                                           "models/arbitary_shape/arbitary_shape_16x9_4.json",fixed_virtual_dim=4,alpha=0.2)
-PEPS_16x9_Z2_Binary_TAT_5_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=195,paras=59328
+PEPS_16x9_Z2_Binary_TAT_5_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=195,paras= 59328
                                                           "models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=4,alpha=0.13)
-PEPS_16x9_Z2_Binary_TAT_6_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras=80640
+PEPS_16x9_Z2_Binary_TAT_6_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras= 80640
                                                           "models/arbitary_shape/arbitary_shape_16x9_6.json",fixed_virtual_dim=4,alpha=0.07)
-PEPS_16x9_Z2_Binary_TAT_7_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras=80640
+PEPS_16x9_Z2_Binary_TAT_7_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras= 80640
                                                           "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=4,alpha=0.05)
-PEPS_16x9_Z2_Binary_TAT_13_v4= PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=195,paras=59328
+PEPS_16x9_Z2_Binary_TAT_13_v4= PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=195,paras= 59328
                                                           "models/arbitary_shape/arbitary_shape_16x9_13.json",fixed_virtual_dim=4,alpha=0.15)
 
 
 PEPS_16x9_Z2_Binary_TAT_Aggregation_12_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=1872,paras=1443450
                                                                 "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 0.13)
+PEPS_16x9_Z2_Binary_TAT_Aggregation_12_3_v2 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=1872,paras=  46272
+                                                                "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 0.23,fixed_virtual_dim=2)
 PEPS_16x9_Z2_Binary_TAT_Aggregation_12_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=1872,paras= 204930
                                                                 "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 0.2,fixed_virtual_dim=3)
 PEPS_16x9_Z2_Binary_TAT_Aggregation_19_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=2964,paras=2327025
@@ -122,7 +124,7 @@ PEPS_16x9_Z2_Binary_TAT_Aggregation_19_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wr
 PEPS_16x9_Z2_Binary_TAT_Aggregation_28_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=4368,paras=3429300
                                                                 "models/arbitary_shape/patch_partions_3column_28units.pt", alpha_list = 0.1)
 PEPS_16x9_Z2_Binary_TAT_Aggregation_28_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=4368,paras= 487620
-                                                                "models/arbitary_shape/patch_partions_3column_28units.pt", alpha_list = 0.17)
+                                                                "models/arbitary_shape/patch_partions_3column_28units.pt", alpha_list = 0.17,fixed_virtual_dim=3)
 
 
 PEPS_16x9_Z2_Binary_TAT_Aggregation_19_5    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,

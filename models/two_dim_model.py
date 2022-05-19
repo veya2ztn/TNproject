@@ -736,7 +736,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                        seted_variation=10,
                        init_std=1e-10,
                        solved_std=None,
-                       convertPeq1=False):
+                       convertPeq1=False,re_cal_path=False):
         super().__init__()
         assert out_features is not None
         assert virtual_bond_dim is not None
@@ -852,7 +852,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
 
         self.operands_string = full_size_array_string(*operands)
         #path,info = oe.contract_path(*operands,optimize='random-greedy-128')
-        path = get_best_path_via_oe(*operands,store="models/arbitrary_shape_path_recorder.json",re_saveQ=False)
+        path = get_best_path_via_oe(*operands,store="models/arbitrary_shape_path_recorder.json",re_saveQ=re_cal_path)
         self.path         = path
         self.sublist_list = sublist_list
         self.outlist      = outlist
@@ -1085,6 +1085,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 print(f'patch_{i}: std:{std.item()} mean:{mean.item()}')
             _input.append(batch_unit)
         return _input
+
     def forward(self,input_data, only_return_input=False):
         _input = self.get_batch_input(input_data)
         if only_return_input:
