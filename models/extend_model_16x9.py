@@ -84,7 +84,7 @@ PEPS_16x9_Z2_Binary_TAT_2_v3 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=
 PEPS_16x9_Z2_Binary_TAT_2_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras=79104
                                                           "models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4,alpha=0.05)
 PEPS_16x9_Z2_Binary_TAT_3_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=325,paras=95424
-                                                          "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=3,alpha=0.03)
+                                                          "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=3,alpha=0.06)
 PEPS_16x9_Z2_Binary_TAT_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=325,paras=227625
                                                           "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=4,alpha=0.02)
 PEPS_16x9_Z2_Binary_TAT_4_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=156,paras=50688
