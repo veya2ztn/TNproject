@@ -803,13 +803,14 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         #since we use symmetry than the center group could not in the symmetry part
         center_group = None
         if label_position != 'no_center':
-            assert out_features == 1
+
             center_group = info_per_point[label_position]['group']
             damgling_num = len(info_per_group)
             info_per_group[center_group]['neighbor'].insert(0,damgling_num)
             info_per_line[(center_group,damgling_num)]={'D': out_features}
             symmetry_map[damgling_num]=set([damgling_num])
-
+        else:
+            assert out_features == 1
         operands = []
         sublist_list=[]
 

@@ -249,6 +249,7 @@ def train_epoch_normal(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode
         model.optimizer.zero_grad()
 
         logit  = model(image)
+        label  = label.squeeze() if len(logit.shape) == 1 else label
         label  = label.long() if logit.shape[-1]>1 else label
         loss   = criterion(logit,label)
         loss.backward()
@@ -288,6 +289,7 @@ def test_epoch(model,dataloader,logsys,accu_list=None,Fethcher=DataSimfetcher,in
                 label = temp
 
             logit  = model(image)
+            label  = label.squeeze() if len(logit.shape) == 1 else label
             label  = label.long() if logit.shape[-1]>1 else label
             #logit  = logit.squeeze()
             labels.append(label)
@@ -738,6 +740,7 @@ def one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,t
 
 
             logit  = model(image)
+            label  = label.squeeze() if len(logit.shape) == 1 else label
             label  = label.long() if logit.shape[-1]>1 else label
             loss   = criterion(logit,label)
             loss.backward()
@@ -1038,22 +1041,23 @@ def test_GPU_memory_usage(project_config):
     tp.table(data, headers_str)
     a,b,_ = linefit(headers,memory_used_record)
 
-    # print("now we test the alpha")
-    alpha_list = np.linspace(1,5,5)
-
-    std_record=[]
-    for alpha in alpha_list:
-        model.set_alpha(alpha)
-        #model.weight_init(method="Expecatation_Normalization2")
-        model  = model.eval()
-        with torch.no_grad():
-            std_list = []
-            for _ in range(10):
-                 std_list.append(torch.std(model(torch.randn(100,1,16,9).cuda())).item())
-        std_record.append(np.mean(std_list))
-    headers_str = [str(np.round(b,1)) for b in alpha_list]
-    data = np.array([std_record])
-    tp.table(data, headers_str)
+    # # print("now we test the alpha")
+    # alpha_list = np.linspace(1,5,5)
+    #
+    # std_record=[]
+    # for alpha in alpha_list:
+    #     model.set_alpha(alpha)
+    #     #model.weight_init(method="Expecatation_Normalization2")
+    #     model  = model.eval()
+    #     with torch.no_grad():
+    #         std_list = []
+    #         for _ in range(10):
+    #              std_list.append(torch.std(model(torch.randn(100,1,16,9).cuda())).item())
+    #     std_record.append(np.mean(std_list))
+    # headers_str = [str(np.round(b,1)) for b in alpha_list]
+    # data = np.array([std_record])
+    #tp.table(data, headers_str)
+    
     if os.path.exists(GPU_MEMORY_CONFIG_FILE):
         with open(GPU_MEMORY_CONFIG_FILE,'r') as f:memory_record = json.load(f)
     else:

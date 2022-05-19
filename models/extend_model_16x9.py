@@ -50,6 +50,8 @@ PEPS_16x9_Z2_Binary_CNNS_4    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Sing
 PEPS_16x9_Z2_Binary_CNNS_5    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=1.5)
 PEPS_16x9_Z2_Binary_CNNS_6    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=2.5)
 PEPS_16x9_Z2_Binary_CNNS_7    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,"models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None)
+PEPS_16x9_Z2_Binary_CNNS_13_v4= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=70,paras=14883
+                                                "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None,alpha=1)
 
 # compate for old model name
 PEPS_16x9_Z2_Binary_CNN_7    = PEPS_16x9_Z2_Binary_CNNS_7
