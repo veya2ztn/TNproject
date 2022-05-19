@@ -88,7 +88,7 @@ fouce_break   = False
 torch.backends.cudnn.enabled  = True
 torch.backends.cudnn.benchmark= False
 torch.backends.cudnn.deterministic= True # the key for continue training.
-
+fail = 0
 while (len(get_jobs(PROJECTFILES))>0 or args.mode == "assign")and (not fouce_break):
     if  args.mode == "assign":
         project_config_path = args.path
@@ -135,6 +135,13 @@ while (len(get_jobs(PROJECTFILES))>0 or args.mode == "assign")and (not fouce_bre
                     from train_base import train_for_one_task
                     project_config.project_json_config_path = project_config_path
                     project_root_dir=train_for_one_task(project_config)
+                    if project_root_dir == 'up tp optuna setted limit':
+                        try:
+                            mymovefile(project_config_path,os.path.join(DONE_DIR,project_config_name))
+                            fail= 0
+                        except:
+                            fail+=1
+                            if fail > 10:raise
                 else:
                     trials       = project_config.train.trials
                     random_seed   =random.randint(1, 100000)

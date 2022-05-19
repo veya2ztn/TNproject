@@ -13,18 +13,18 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                                     ],
                                      "grad_clip":None,
                                      'warm_up_epoch':20,
-                                     'epoches': 50,
+                                     'epoches': 200,
                                      'use_swa':False,
                                      'swa_start':20,
-                                     'BATCH_SIZE':1000,
+                                     'BATCH_SIZE':200,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
                                      'doearlystop':False,
                                      'doanormaldt':True,
                                      'use_metatrain':True,
-                                     'optuna_limit_trials':40})]
+                                     'optuna_limit_trials':36})]
 
-hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_prune':True,
+hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':6},'not_prune':True,
                                        'optimizer_list':{
                                                 'Adam':{'lr':[0.0005,0.005],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
@@ -36,7 +36,7 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':5},'not_
                                         #                    1,
                                                             #"all_convert"
                                         #                    ],
-                                       #'batch_size_list':[100,200,300],
+                                       'batch_size_list':[10,50,100,200,300],
                                                         })]
 #hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
@@ -64,8 +64,16 @@ dmlist=[
            #                           })
            # ),
        [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-           'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_Aggregation_28_3_v3','backbone_config':{"out_features":1},
-           'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_Aggregation_28_3_v3',
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_13_v4','backbone_config':{"out_features":1},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_13_v4',
+       })],
+       [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_3_v4','backbone_config':{"out_features":1},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_3_v4',
+       })],
+       [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+           'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_2_v4','backbone_config':{"out_features":1},
+           'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_2_v4',
        })],
        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNN_7','backbone_config':{"alpha":4,"out_features":1,"convertPeq1":True},

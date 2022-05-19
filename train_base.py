@@ -249,6 +249,7 @@ def train_epoch_normal(model,dataloader,logsys,Fethcher=DataSimfetcher,test_mode
         model.optimizer.zero_grad()
 
         logit  = model(image)
+        label  = label.long() if logit.shape[-1]>1 else label
         loss   = criterion(logit,label)
         loss.backward()
         if hasattr(model.optimizer,"grad_clip") and (model.optimizer.grad_clip is not None):
@@ -285,10 +286,12 @@ def test_epoch(model,dataloader,logsys,accu_list=None,Fethcher=DataSimfetcher,in
                 temp  = image
                 image = label
                 label = temp
+
             logit  = model(image)
+            label  = label.long() if logit.shape[-1]>1 else label
             #logit  = logit.squeeze()
-            labels.append(label.detach().cpu())
-            logits.append(logit.detach().cpu())
+            labels.append(label)
+            logits.append(logit)
     labels  = torch.cat(labels)
     logits  = torch.cat(logits)
     # print(logits.shape)
@@ -733,7 +736,9 @@ def one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,t
                 label = temp
             model.optimizer.zero_grad()
 
+
             logit  = model(image)
+            label  = label.long() if logit.shape[-1]>1 else label
             loss   = criterion(logit,label)
             loss.backward()
             if hasattr(model.optimizer,"grad_clip") and (model.optimizer.grad_clip is not None):
@@ -755,15 +760,15 @@ def one_complete_train_metastep(model,project,train_loader,valid_loader,logsys,t
             saveQ = not (hasattr(args.train,'turn_off_save_latest') and args.train.turn_off_save_latest)
             bad_condition_happen = logsys.save_latest_ckpt(model,epoch,train_loss,saveQ=saveQ,doearlystop=False)
 
-            if epoch%10==0:
-                valid_acc_pool = test_epoch(model,valid_loader,logsys,accu_list=accu_list)
-                update_accu    = logsys.metric_dict.update(valid_acc_pool,epoch)
-                metric_dict    = logsys.metric_dict.metric_dict
-                for accu_type in accu_list:
-                    logsys.record(accu_type, valid_acc_pool[accu_type], epoch)
-                    logsys.record('best_'+accu_type, metric_dict['best_'+accu_type][accu_type], epoch)
-                logsys.banner_show(epoch,FULLNAME,train_losses=[train_loss])
-                earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
+            #if epoch%3==0:
+            valid_acc_pool = test_epoch(model,valid_loader,logsys,accu_list=accu_list)
+            update_accu    = logsys.metric_dict.update(valid_acc_pool,epoch)
+            metric_dict    = logsys.metric_dict.metric_dict
+            for accu_type in accu_list:
+                logsys.record(accu_type, valid_acc_pool[accu_type], epoch)
+                logsys.record('best_'+accu_type, metric_dict['best_'+accu_type][accu_type], epoch)
+            logsys.banner_show(epoch,FULLNAME,train_losses=[train_loss])
+            earlystopQ  = logsys.save_best_ckpt(model,metric_dict,epoch,doearlystop=doearlystop)
 
             ### inference phase ########
             if trial:
@@ -959,7 +964,7 @@ def train_for_one_task(project_config):
                                     )
         optuna_limit_trials = project_config.train.optuna_limit_trials if hasattr(project_config.train,"optuna_limit_trials") else 30
         if len([t.state for t in study.trials if t.state== TrialState.COMPLETE])>optuna_limit_trials:
-        	raise
+        	return 'up tp optuna setted limit'
         #study.optimize(objective, n_trials=50, timeout=600,pruner=optuna.pruners.MedianPruner())
         hypertuner_config = project_config.train.hypertuner_config if hasattr(project_config.train,"hypertuner_config") else {'n_trials':3}
         study.optimize(objective, **hypertuner_config)
@@ -1010,7 +1015,8 @@ def test_GPU_memory_usage(project_config):
             train_loader = DataLoader(dataset=dataset_train,batch_size=batch)
         try:
             train_epoch(model,train_loader,logsys,test_mode=True)
-            memory_used = float(torch.cuda.memory_stats()['reserved_bytes.all.peak'])/1024/1024
+            #memory_used = float(torch.cuda.memory_stats()['reserved_bytes.all.peak'])/1024/1024
+            memory_used = query_gpu()[0]['memory.used']
             memory_used_record.append(memory_used)
             headers.append(batch)
             torch.cuda.empty_cache()
