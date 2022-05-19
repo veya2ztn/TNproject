@@ -803,6 +803,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         #since we use symmetry than the center group could not in the symmetry part
         center_group = None
         if label_position != 'no_center':
+            assert out_features == 1
             center_group = info_per_point[label_position]['group']
             damgling_num = len(info_per_group)
             info_per_group[center_group]['neighbor'].insert(0,damgling_num)
@@ -1021,7 +1022,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         else:
             raise NotImplementedError(f"we dont have init option:{method}")
 
-    def forward(self,input_data, only_return_input=False):
+    def get_batch_input(self,input_data):
         #input data shape B,1,W,H
         assert len(input_data.shape)==4
         assert np.prod(input_data.shape[-2:])==len(self.info_per_point)
@@ -1082,6 +1083,9 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                 std,mean = torch.std_mean(batch_unit)
                 print(f'patch_{i}: std:{std.item()} mean:{mean.item()}')
             _input.append(batch_unit)
+        return _input
+    def forward(self,input_data, only_return_input=False):
+        _input = self.get_batch_input(input_data)
         if only_return_input:
             return _input
         #return _input,_units
