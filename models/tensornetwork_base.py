@@ -6,6 +6,7 @@ from inspect import signature
 import numpy as np
 import os
 import json
+import random
 from .model_utils import full_size_array_string
 path_recorder  = "./arbitrary_shape_path_recorder.json"
 class TN_Base(nn.Module):
@@ -178,10 +179,12 @@ class TN_Base(nn.Module):
 
     def load_from(self,path):
         checkpoint = torch.load(path)
+        print(checkpoint.keys())
         if ('state_dict' not in checkpoint):
             self.load_state_dict(checkpoint)
         else:
             self.load_state_dict(checkpoint['state_dict'])
+
         if 'optimizer' in checkpoint:
             print("we find existed optimizer checkpoint")
             if hasattr(self,'optimizer') and self.optimizer is not None:
@@ -206,7 +209,7 @@ class TN_Base(nn.Module):
         checkpoint={}
         checkpoint['epoch']  =  epoch
         checkpoint['state_dict']    = self.state_dict()
-        checkpoint['use_focal_loss']= self.focal_lossQ
+        #checkpoint['use_focal_loss']= self.focal_lossQ
         if mode != "light":
             checkpoint['optimizer']     = self.optimizer.state_dict()
             checkpoint['rnd_seed']     = {

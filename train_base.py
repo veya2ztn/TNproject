@@ -471,7 +471,7 @@ def one_complete_train(model,project,train_loader,valid_loader,logsys,trial=Fals
         routine_ckpt,best_ckpt = logsys.archive_saver(f"archive_at_{start_epoch}")
         show_start_status = True
         doearlystop = False
-        raise
+        #raise
 
 
 
@@ -1007,7 +1007,7 @@ def test_GPU_memory_usage(project_config):
     #print(model)
     memory_used_record=[]
     headers = []
-    batches = [10,30,60,90,120,150,180,200,300]
+    batches = [10,30,60,90,120,150,180,200,3000]
     # train phase
 
     for batch in batches:
@@ -1041,32 +1041,32 @@ def test_GPU_memory_usage(project_config):
     data = np.array([memory_used_record])
     tp.banner(PROJECTNAME)
     tp.table(data, headers_str)
-    a,b,_ = linefit(headers,memory_used_record)
-
-    # # print("now we test the alpha")
-    # alpha_list = np.linspace(1,5,5)
+    # a,b,_ = linefit(headers,memory_used_record)
     #
-    # std_record=[]
-    # for alpha in alpha_list:
-    #     model.set_alpha(alpha)
-    #     #model.weight_init(method="Expecatation_Normalization2")
-    #     model  = model.eval()
-    #     with torch.no_grad():
-    #         std_list = []
-    #         for _ in range(10):
-    #              std_list.append(torch.std(model(torch.randn(100,1,16,9).cuda())).item())
-    #     std_record.append(np.mean(std_list))
-    # headers_str = [str(np.round(b,1)) for b in alpha_list]
-    # data = np.array([std_record])
-    #tp.table(data, headers_str)
-
-    if os.path.exists(GPU_MEMORY_CONFIG_FILE):
-        with open(GPU_MEMORY_CONFIG_FILE,'r') as f:memory_record = json.load(f)
-    else:
-        memory_record = {}
-    MODEL_TYPE       = project.full_config.model.str_backbone_TYPE
-    memory_record[MODEL_TYPE]=[a,b]
-    with open(GPU_MEMORY_CONFIG_FILE,'w') as f:json.dump(memory_record,f)
-    print("拟合结果: y = %10.5f x + %10.5f " % (a,b) )
+    # # # print("now we test the alpha")
+    # # alpha_list = np.linspace(1,5,5)
+    # #
+    # # std_record=[]
+    # # for alpha in alpha_list:
+    # #     model.set_alpha(alpha)
+    # #     #model.weight_init(method="Expecatation_Normalization2")
+    # #     model  = model.eval()
+    # #     with torch.no_grad():
+    # #         std_list = []
+    # #         for _ in range(10):
+    # #              std_list.append(torch.std(model(torch.randn(100,1,16,9).cuda())).item())
+    # #     std_record.append(np.mean(std_list))
+    # # headers_str = [str(np.round(b,1)) for b in alpha_list]
+    # # data = np.array([std_record])
+    # #tp.table(data, headers_str)
+    #
+    # if os.path.exists(GPU_MEMORY_CONFIG_FILE):
+    #     with open(GPU_MEMORY_CONFIG_FILE,'r') as f:memory_record = json.load(f)
+    # else:
+    #     memory_record = {}
+    # MODEL_TYPE       = project.full_config.model.str_backbone_TYPE
+    # memory_record[MODEL_TYPE]=[a,b]
+    # with open(GPU_MEMORY_CONFIG_FILE,'w') as f:json.dump(memory_record,f)
+    # print("拟合结果: y = %10.5f x + %10.5f " % (a,b) )
     del model
     torch.cuda.empty_cache()

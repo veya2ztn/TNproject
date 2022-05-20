@@ -44,7 +44,9 @@ class PEPS_16x9_Z2_Binary_Aggregation_Wrapper:
 PEPS_16x9_Z2_Binary_CNNS_2    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=169121
                                                             "models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=None,alpha=3)
 PEPS_16x9_Z2_Binary_CNNS_2_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=22180
-                                                            "models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4,alpha=1.1)
+                                                            "models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4,alpha=1.5)
+PEPS_16x9_Z2_Binary_CNNS_2_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=50813
+                                                            "models/arbitary_shape/arbitary_shape_16x9_2.json",fixed_virtual_dim=4,alpha=2.5)
 PEPS_16x9_Z2_Binary_CNNS_3    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=130,paras=172408
                                                             "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=None,alpha=3)
 PEPS_16x9_Z2_Binary_CNNS_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=130,paras=55360
@@ -59,9 +61,14 @@ PEPS_16x9_Z2_Binary_CNNS_6    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Sing
                                                             "models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=None,alpha=2.5)
 PEPS_16x9_Z2_Binary_CNNS_7    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=172160
                                                             "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None)
-PEPS_16x9_Z2_Binary_CNNS_13_v4= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=70,paras=14883
+PEPS_16x9_Z2_Binary_CNNS_13   = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=172160
                                                 "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=None,alpha=1)
-
+PEPS_16x9_Z2_Binary_CNNS_13_v4= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=23716
+                                                "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=4,alpha=1.5)
+PEPS_16x9_Z2_Binary_CNNS_13_v5= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=54438
+                                                "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=5,alpha=2.5)
+PEPS_16x9_Z2_Binary_CNNS_13_v6= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=109188
+                                                "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=6,alpha=4)
 # compate for old model name
 PEPS_16x9_Z2_Binary_CNN_7    = PEPS_16x9_Z2_Binary_CNNS_7
 PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_CNNS_2

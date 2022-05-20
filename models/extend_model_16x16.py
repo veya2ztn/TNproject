@@ -53,6 +53,8 @@ PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v4    = PEPS_16x16_Z2_Binary_Aggrega
 
 PEPS_16x16_Z2_Binary_TAT_6x6_0_v4 = PEPS_16x16_Z2_Binary_Wrapper(TensorAttention,#ops=113,paras=34736
                                         "models/arbitary_shape/arbitary_shape_16x16_6x6.json",fixed_virtual_dim=4   ,alpha=0.02)
+PEPS_16x16_Z2_Binary_TAT_6x6_0_v5 = PEPS_16x16_Z2_Binary_Wrapper(TensorAttention,#ops=113,paras=82240
+                                        "models/arbitary_shape/arbitary_shape_16x16_6x6.json",fixed_virtual_dim=5   ,alpha=0.015)                                        
 PEPS_16x16_Z2_Binary_TAT_8x8_0_v4 = PEPS_16x16_Z2_Binary_Wrapper(TensorAttention,#ops=204,paras=59936
                                         "models/arbitary_shape/arbitary_shape_16x16_8x8.json",fixed_virtual_dim=4   ,alpha=0.005)
 
