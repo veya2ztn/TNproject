@@ -21,7 +21,7 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                      'do_extra_phase':False,
                                      'doearlystop':True,
                                      'doanormaldt':True,
-                                     #'use_metatrain':True,
+                                     'use_metatrain':True,
                                      'optuna_limit_trials':8})]
 
 hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':2},'not_prune':True,
@@ -60,21 +60,25 @@ msdataT_RDNM55   =msdataT_RDN.copy({'image_transformer':'-0.5-0.5'})
 dmlist=[
 
             [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v2','backbone_config':{"out_features":1},
-            'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v2','valid_batch':3000,'train_batches':10800*5
-            })],
+                'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5_v4','backbone_config':{"out_features":1},
+                'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5_v4','valid_batch':500,'train_batches':500
+                })],
+            [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+                'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5_v3','backbone_config':{"out_features":1},
+                'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5_v3','valid_batch':3000,'train_batches':3000
+                })],
             [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','backbone_config':{"out_features":1},
-            'backbone_alias':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','valid_batch':3000,'train_batches':10800
-            })],
-            [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v3','backbone_config':{"out_features":1},
-            'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v3','valid_batch':3000,'train_batches':10800//2
-            })],
-            [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v2','backbone_config':{"out_features":1},
-            'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v2','valid_batch':3000,'train_batches':10800
-            })],
+                'backbone_TYPE':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v4','backbone_config':{"out_features":1},
+                'backbone_alias':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v4','valid_batch':3000,'train_batches':3000
+                })],
+            # [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+            #     'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v3','backbone_config':{"out_features":1},
+            #     'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v3','valid_batch':3000,'train_batches':10800//2
+            #     })],
+            # [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+                # 'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v4','backbone_config':{"out_features":1},
+                # 'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v4','valid_batch':3000,'train_batches':10800
+                # })],
 
         ]
 # dmlist=[(MNIST_DATA_Config,

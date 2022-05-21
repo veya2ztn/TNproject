@@ -47,7 +47,7 @@ PEPS_16x16_Z2_Binary_CNN_8x8_0_v4 = PEPS_16x16_Z2_Binary_Wrapper(TensorNetConvND
                                         "models/arbitary_shape/arbitary_shape_16x16_8x8.json",fixed_virtual_dim=4   ,alpha=1.5)
 PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3    = PEPS_16x16_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1232,paras=112518
                                                                 "models/arbitary_shape/patch_partions_28_6x6_Z2_json_list.pt",fixed_virtual_dim=3, alpha_list = 0.7)
-PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v4    = PEPS_16x16_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,
+PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v4    = PEPS_16x16_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1232,paras=301420
                                                                 "models/arbitary_shape/patch_partions_28_6x6_Z2_json_list.pt",fixed_virtual_dim=4, alpha_list = 1)
 PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v2    = PEPS_16x16_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1232,paras=35864
                                                                 "models/arbitary_shape/patch_partions_28_6x6_Z2_json_list.pt",fixed_virtual_dim=2, alpha_list = 0.35)

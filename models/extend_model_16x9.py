@@ -149,7 +149,11 @@ PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wr
 
 PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,
                                                                 "models/arbitary_shape/patch_partions_5column_28units.pt", alpha_list = 2)
+PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=7280,paras=765234
+                                                                "models/arbitary_shape/patch_partions_5column_28units.pt", alpha_list = 0.1,fixed_virtual_dim=3)
 
+PEPS_16x9_Z2_Binary_TAT_Aggregation_28_5_v4 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=7280,paras=2308608
+                                                                "models/arbitary_shape/patch_partions_5column_28units.pt", alpha_list = 0.07,fixed_virtual_dim=4)
 
 def PEPS_16x9_Z2_Binary_CNN_full(**kargs):
     model=PEPS_einsum_arbitrary_partition_optim(out_features=1,
