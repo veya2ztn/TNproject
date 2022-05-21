@@ -13,18 +13,18 @@ trainbases= [Train_Base_Default.copy({'accu_list':[#'MSError',
                                                     ],
                                      "grad_clip":None,
                                      'warm_up_epoch':100,
-                                     'epoches': 500,
+                                     'epoches': 300,
                                      'use_swa':False,
                                      'swa_start':20,
                                      #'BATCH_SIZE':10800,
                                      'drop_rate':None,
                                      'do_extra_phase':False,
-                                     'doearlystop':False,
+                                     'doearlystop':True,
                                      'doanormaldt':True,
                                      #'use_metatrain':True,
-                                     'optuna_limit_trials':6})]
+                                     'optuna_limit_trials':8})]
 
-hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':1},'not_prune':True,
+hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':2},'not_prune':True,
                                        'optimizer_list':{
                                                 'Adam':{'lr':[0.0005,0.005],  'betas':[[0.5,0.9],0.999]},
                                                 #'Adabelief':{'lr':[0.0005,0.005],'eps':[1e-11,1e-7],'weight_decouple': True,'rectify':True,'print_change_log':False}
@@ -38,7 +38,7 @@ hypertuner= [Optuna_Train_Default.copy({'hypertuner_config':{'n_trials':1},'not_
                                         #                    ],
                                        #'batch_size_list':[200,10800],
                                                         })]
-hypertuner= [Normal_Train_Default]
+#hypertuner= [Normal_Train_Default]
 schedulers= [Scheduler_None]
 #schedulers= [Scheduler_CosALR_Default.copy({"config":{"T_max":32}})]
 optimizers= [Optimizer_Adam.copy({"config":{"lr":0.001}})]
@@ -59,39 +59,22 @@ msdataT_RDNfft   =msdataT_RDN.copy({'image_transformer':'fft16x9_norm'})
 msdataT_RDNM55   =msdataT_RDN.copy({'image_transformer':'-0.5-0.5'})
 dmlist=[
 
-        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
-        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_2_v4','backbone_config':{"out_features":2},
-        #     'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_2_v4_CE','valid_batch':3000,'train_batches':3000
-        # })],
-        #
-        # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"CELoss",#'criterion_config':{'reduction':'sum'},
-        #     'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_2_v5','backbone_config':{"out_features":2},
-        #     'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_2_v5_CE','valid_batch':3000,'train_batches':3000
-        # })],
-
-
             [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_2_v5','backbone_config':{"out_features":1},
-            'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_2_v5','valid_batch':3000,'train_batches':3000
+            'backbone_TYPE':'PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v2','backbone_config':{"out_features":1},
+            'backbone_alias':'PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v2','valid_batch':3000,'train_batches':10800*5
             })],
-
             [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-              'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_8x8_0_v4','backbone_config':{"out_features":1},
-              'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_8x8_0_v4','valid_batch':1000,'train_batches':1000
+            'backbone_TYPE':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','backbone_config':{"out_features":1},
+            'backbone_alias':'PEPS_16x16_Z2_Binary_CNN_Aggregation_6x6_28_v3','valid_batch':3000,'train_batches':10800
             })],
-
             [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-              'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_6x6_0_v5','backbone_config':{"out_features":1},
-              'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_6x6_0_v5','valid_batch':3000,'train_batches':3000
+            'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v3','backbone_config':{"out_features":1},
+            'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v3','valid_batch':3000,'train_batches':10800//2
             })],
-
-            # [msdataT_RDNfft,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
-            # 'backbone_TYPE':'PEPS_16x9_Z2_Binary_CNNS_3_v5','backbone_config':{"out_features":1},
-            # 'backbone_alias':'PEPS_16x9_Z2_Binary_CNNS_3_v5','valid_batch':1000
-            # })],
-
-
-
+            [msdataT_RDNM55,  backbone_templete.copy({'criterion_type':"BCEWithLogitsLoss",#'criterion_config':{'reduction':'sum'},
+            'backbone_TYPE':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v2','backbone_config':{"out_features":1},
+            'backbone_alias':'PEPS_16x16_Z2_Binary_TAT_Aggregation_6x6_28_v2','valid_batch':3000,'train_batches':10800
+            })],
 
         ]
 # dmlist=[(MNIST_DATA_Config,
