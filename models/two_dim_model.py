@@ -1123,7 +1123,7 @@ class PEPS_aggregation_model(TN_Base):
                        seted_variation=10,
                        init_std=1e-10,
                        solved_std=None,
-                       convertPeq1=False):
+                       convertPeq1=False,complex_number_mode=False):
         super().__init__()
         assert out_features is not None
         assert virtual_bond_dim is not None
@@ -1190,7 +1190,8 @@ class PEPS_aggregation_model(TN_Base):
                                                                            seted_variation=seted_variation,
                                                                            init_std=init_std,
                                                                            solved_std=solved_std,
-                                                                           convertPeq1=convertPeq1))
+                                                                           convertPeq1=convertPeq1,
+                                                                           complex_number_mode=complex_number_mode))
         path_array_string_store={}
         for layer_id,layer in enumerate(self.modules_list):
             if layer.operands_string not in path_array_string_store:path_array_string_store[layer.operands_string]=[]

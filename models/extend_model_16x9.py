@@ -1,12 +1,13 @@
 from .extend_model import *
 
 class PEPS_16x9_Z2_Binary_Wrapper:
-    def __init__(self,module,structure_path,alpha=3,fixed_virtual_dim=None):
+    def __init__(self,module,structure_path,alpha=3,fixed_virtual_dim=None,complex_number_mode=False):
         self.module  = module
         self.structure_path = structure_path
         self.fixed_virtual_dim = fixed_virtual_dim
         self.__name__ = f"PEPS_16x9_Z2_Binary_{module.__class__.__name__}"
         self.alpha = alpha
+        self.complex_number_mode=complex_number_mode
     def __call__(self,alpha=None,**kargs):
         if alpha is None:alpha = self.alpha
         module = lambda *args:self.module(*args,alpha=alpha)
@@ -14,18 +15,20 @@ class PEPS_16x9_Z2_Binary_Wrapper:
                                                     label_position=(8,4),fixed_virtual_dim=self.fixed_virtual_dim,
                                                     symmetry="Z2_16x9",
                                                     patch_engine=module,
+                                                    complex_number_mode=self.complex_number_mode,
                                                     **kargs
                                                )
         model.weight_init(method="Expecatation_Normalization2")
         return model
 class PEPS_16x9_Z2_Binary_Aggregation_Wrapper:
-    def __init__(self,module,structure_path,alpha_list=1,fixed_virtual_dim=5,convertPeq1=True):
+    def __init__(self,module,structure_path,alpha_list=1,fixed_virtual_dim=5,convertPeq1=True,complex_number_mode=False):
         self.module  = module
         self.structure_path = structure_path
         self.fixed_virtual_dim = fixed_virtual_dim
         self.convertPeq1 = convertPeq1
         self.__name__ = f"PEPS_16x9_Z2_Binary_{module.__class__.__name__}"
         self.alpha_list = alpha_list
+        self.complex_number_mode=complex_number_mode
     def __call__(self,alpha_list=None,**kargs):
         if alpha_list is None:alpha_list = self.alpha_list
         model=PEPS_aggregation_model(
@@ -35,7 +38,9 @@ class PEPS_16x9_Z2_Binary_Aggregation_Wrapper:
                                    patch_engine=self.module,
                                    alpha_list=alpha_list,
                                    fixed_virtual_dim=self.fixed_virtual_dim,
-                                   convertPeq1=self.convertPeq1,**kargs
+                                   convertPeq1=self.convertPeq1,
+                                   complex_number_mode=self.complex_number_mode,
+                                   **kargs
                                   )
         model.weight_init(method="Expecatation_Normalization2")
         return model
@@ -51,6 +56,8 @@ PEPS_16x9_Z2_Binary_CNNS_3    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Sing
                                                             "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=None,alpha=3)
 PEPS_16x9_Z2_Binary_CNNS_3_v5 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=130,paras=55360
                                                             "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=5,alpha=4)
+PEPS_16x9_Z2_Binary_CNNS_3_v5_C = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=130,paras=55360
+                                                            "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=5,alpha=400,complex_number_mode=True)
 PEPS_16x9_Z2_Binary_CNNS_3_v8 = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,
                                                             "models/arbitary_shape/arbitary_shape_16x9_3.json",fixed_virtual_dim=8,alpha=2.5)
 PEPS_16x9_Z2_Binary_CNNS_4    = PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=56,paras=181175
@@ -67,8 +74,12 @@ PEPS_16x9_Z2_Binary_CNNS_13_v4= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Sing
                                                 "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=4,alpha=1.5)
 PEPS_16x9_Z2_Binary_CNNS_13_v5= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=54438
                                                 "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=5,alpha=2.5)
+PEPS_16x9_Z2_Binary_CNNS_13_v5_C= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=54438
+                                                "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=5,alpha=500,complex_number_mode=True)
 PEPS_16x9_Z2_Binary_CNNS_13_v6= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=109188
                                                 "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=6,alpha=4)
+PEPS_16x9_Z2_Binary_CNNS_13_v6_C= PEPS_16x9_Z2_Binary_Wrapper(TensorNetConvND_Single,#ops=104,paras=109188
+                                                "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=6,alpha=900,complex_number_mode=True)
 # compate for old model name
 PEPS_16x9_Z2_Binary_CNN_7    = PEPS_16x9_Z2_Binary_CNNS_7
 PEPS_16x9_Z2_Binary_CNN_0    = PEPS_16x9_Z2_Binary_CNNS_2
@@ -84,6 +95,8 @@ PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3    = PEPS_16x9_Z2_Binary_Aggregation_Wr
                                                                 "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 1)
 PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops= 672,paras=  68850
                                                                 "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 0.6,fixed_virtual_dim=3)
+PEPS_16x9_Z2_Binary_CNN_Aggregation_12_3_v3_C = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops= 672,paras=  68850
+                                                                "models/arbitary_shape/patch_partions_3column_12units.pt", alpha_list = 60,fixed_virtual_dim=3,complex_number_mode=True)
 PEPS_16x9_Z2_Binary_CNN_Aggregation_28_3    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1568,paras=1019620
                                                                 "models/arbitary_shape/patch_partions_3column_28units.pt", alpha_list = 1)
 PEPS_16x9_Z2_Binary_CNN_Aggregation_19_5    = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorNetConvND_Single,#ops=1976,paras=1114447
@@ -112,6 +125,8 @@ PEPS_16x9_Z2_Binary_TAT_5_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=
                                                           "models/arbitary_shape/arbitary_shape_16x9_5.json",fixed_virtual_dim=4,alpha=0.13)
 PEPS_16x9_Z2_Binary_TAT_6_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras= 80640
                                                           "models/arbitary_shape/arbitary_shape_16x9_6.json",fixed_virtual_dim=4,alpha=0.07)
+PEPS_16x9_Z2_Binary_TAT_6_v4_C = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras= 80640
+                                                          "models/arbitary_shape/arbitary_shape_16x9_6.json",fixed_virtual_dim=4,alpha=2000,complex_number_mode=True)
 PEPS_16x9_Z2_Binary_TAT_7_v4 = PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=260,paras= 80640
                                                           "models/arbitary_shape/arbitary_shape_16x9_7.json",fixed_virtual_dim=4,alpha=0.05)
 PEPS_16x9_Z2_Binary_TAT_13_v4= PEPS_16x9_Z2_Binary_Wrapper(TensorAttention,#ops=195,paras= 59328
@@ -144,6 +159,8 @@ PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5    = PEPS_16x9_Z2_Binary_Aggregation_Wr
                                                                 "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 0.1)
 PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v2 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=3120,paras=71456
                                                                 "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 0.1,fixed_virtual_dim=2)
+PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v2_C= PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=3120,paras=71456
+                                                                "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list =30,fixed_virtual_dim=2,complex_number_mode=True)
 PEPS_16x9_Z2_Binary_TAT_Aggregation_12_5_v3 = PEPS_16x9_Z2_Binary_Aggregation_Wrapper(TensorAttention,#ops=3120,paras=322758
                                                                 "models/arbitary_shape/patch_partions_5column_12units.pt", alpha_list = 0.1,fixed_virtual_dim=3)
 
