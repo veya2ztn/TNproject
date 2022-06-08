@@ -736,7 +736,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
                        seted_variation=10,
                        init_std=1e-10,
                        solved_std=None,
-                       convertPeq1=False,re_cal_path=False):
+                       convertPeq1=False,re_cal_path=False,complex_number_mode=False):
         super().__init__()
         assert out_features is not None
         assert virtual_bond_dim is not None
@@ -909,11 +909,15 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             #bias_mat    = torch.normal(0,solved_std,(P,*shape))
             #bias_mat[control_mat.nonzero(as_tuple=True)]=0
             #unique_unit_list.append(control_mat+bias_mat)
+            if complex_number_mode:shape.append(2)
             unique_unit_list.append(self.rde2D((P,*shape),init_std,offset=1))
             #unique_unit_list.append(torch.normal(mean=0,std=solved_std,size=(P,*shape)))
         #assert len(unit_list)==len(sublist_list)
 
-        self.unique_unit_list         = [nn.Parameter(v) for v in unique_unit_list]
+        if complex_number_mode:
+            self.unique_unit_list         = [nn.Parameter(torch.view_as_complex(v)) for v in unique_unit_list]
+        else:
+            self.unique_unit_list         = [nn.Parameter(v) for v in unique_unit_list]
         self.unique_groupwise_backend = nn.ModuleList()
         if center_group is not None:
             center_group_unique_idx = info_per_group[center_group]["weight_idx"]
@@ -926,7 +930,10 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             else:
                 offset = 1
                 inchan = 1
-            self.unique_groupwise_backend.append(patch_engine(v.shape[offset:],inchan))
+            if complex_number_mode:
+                self.unique_groupwise_backend.append(patch_engine(v.shape[offset:-1],inchan))
+            else:
+                self.unique_groupwise_backend.append(patch_engine(v.shape[offset:],inchan))
         for i, v in enumerate(self.unique_unit_list):self.register_parameter(f'unit_{i}', param=v)
         #put the tensor into the AD graph.
         #assert len(self.unit_list)==len(sublist_list)
@@ -937,7 +944,7 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
         self.symmetry_map_point =symmetry_map_point
         self.pre_activate_layer = nn.Identity()
         self.debugQ=False
-
+        self.complex_number_mode = complex_number_mode
     def generate_symmetry_map(self,symmetry,info_per_point):
         symmetry_map       = {}
         symmetry_map_point = {}
@@ -1067,11 +1074,14 @@ class PEPS_einsum_arbitrary_partition_optim(TN_Base):
             #_input.append(batch_input)
 
             batch_unit = torch.tensordot(batch_input,unit,dims=([-1], [0]))
+            if self.complex_number_mode:
+                batch_unit = batch_unit.abs()
             batch_unit = self.pre_activate_layer(batch_unit)
             #print(f"{batch_unit.shape}->",end=' ')
+            #print(unit_engine)
             batch_unit = unit_engine(batch_unit)
 
-            ##print(f"{batch_unit.shape}",end='\n')
+            #print(f"{batch_unit.shape}",end='\n')
             ##print(f"{batch_input.norm()}-{unit.norm()}->{batch_unit.norm()}")
             ##print(batch_unit.shape)
 

@@ -200,7 +200,7 @@ class TensorNetConvND_Single(TensorNetConvND):
         cnn1 = get_ConND(in_channels,out_channels,num_dims,bias=False,**kargs)
         bn1  = nn.LayerNorm(shape)
         self.engine = nn.Sequential(cnn1,bn1)
-        #self.dropout= nn.Dropout(p=0.1) #
+
         coef   = cal_scale(shape,alpha)
         self.resize_layer=scaled_Tanh(coef)
         self.reset_parameters()
